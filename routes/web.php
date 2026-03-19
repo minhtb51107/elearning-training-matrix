@@ -39,15 +39,18 @@ Route::middleware('auth')->group(function () {
     // CỤM ROUTE DÀNH CHO ADMIN HỆ THỐNG (ROLE 1)
     // ==============================================================
     Route::prefix('system')->name('system.')->group(function () {
-        // 👇 ĐÃ TRỎ SANG CONTROLLER MỚI CỦA SYSTEM ADMIN VÀ THÊM ROUTE UPDATE STATUS 👇
+        // QUẢN LÝ YÊU CẦU ĐÀO TẠO
         Route::get('/requests', [\App\Http\Controllers\SystemAdmin\TrainingRequestController::class, 'index'])->name('requests.index');
         Route::get('/requests/{trainingRequest}', [\App\Http\Controllers\SystemAdmin\TrainingRequestController::class, 'show'])->name('requests.show');
         Route::put('/requests/{trainingRequest}/status', [\App\Http\Controllers\SystemAdmin\TrainingRequestController::class, 'updateStatus'])->name('requests.update-status');
         
-        Route::get('/courses', function () { return Inertia::render('SystemAdmin/Courses/Index'); })->name('courses.index');
-        Route::get('/courses/create', function () { return Inertia::render('SystemAdmin/Courses/Create'); })->name('courses.create');
+        // 👇 ĐÃ TRỎ SANG CONTROLLER MỚI CỦA KHÓA HỌC 👇
+        Route::get('/courses', [\App\Http\Controllers\SystemAdmin\CourseController::class, 'index'])->name('courses.index');
+        Route::get('/courses/create', [\App\Http\Controllers\SystemAdmin\CourseController::class, 'create'])->name('courses.create');
+        Route::post('/courses', [\App\Http\Controllers\SystemAdmin\CourseController::class, 'store'])->name('courses.store');
+        Route::get('/courses/{course}', [\App\Http\Controllers\SystemAdmin\CourseController::class, 'show'])->name('courses.show');
+        
         Route::get('/courses/{id}/statistics', function () { return Inertia::render('SystemAdmin/Courses/Statistics'); })->name('courses.statistics');
-        Route::get('/courses/{id}', function () { return Inertia::render('SystemAdmin/Courses/Show'); })->name('courses.show');
         Route::get('/classes', function () { return Inertia::render('SystemAdmin/Classes/Index'); })->name('classes.index');
         Route::get('/classes/create', function () { return Inertia::render('SystemAdmin/Classes/Create'); })->name('classes.create');
         Route::get('/classes/{id}', function () { return Inertia::render('SystemAdmin/Classes/Show'); })->name('classes.show');

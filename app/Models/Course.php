@@ -3,19 +3,27 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Course extends Model
 {
-    public function classes() {
-    return $this->hasMany(CourseClass::class, 'course_id');
-}
+    use SoftDeletes;
 
-public function trainingRequests() {
-    return $this->hasMany(TrainingRequest::class);
-}
+    protected $fillable = [
+        'code',
+        'name',
+        'target_audience',
+        'format',
+        'duration',
+        'content',
+        'description',
+        'reason',
+        'status'
+    ];
 
-// Lấy các phòng ban được phép học khóa này (từ bảng trung gian course_departments)
-public function departments() {
-    return $this->belongsToMany(Department::class, 'course_departments');
-}
+    // Khóa học có thể chứa nhiều yêu cầu đào tạo
+    public function trainingRequests()
+    {
+        return $this->hasMany(TrainingRequest::class);
+    }
 }

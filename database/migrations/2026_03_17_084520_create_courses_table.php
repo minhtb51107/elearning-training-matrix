@@ -10,22 +10,22 @@ return new class extends Migration
     {
         Schema::create('courses', function (Blueprint $table) {
             $table->id();
-            $table->string('code', 50)->unique()->index(); 
+            $table->string('code')->unique();
             $table->string('name');
-            $table->text('description')->nullable();
-            $table->longText('content')->nullable();
+            
+            // Các trường mới bổ sung theo form BA
             $table->string('target_audience')->nullable();
-            $table->enum('format', ['online', 'offline', 'hybrid'])->default('online');
-            $table->integer('duration_minutes')->comment('Thời lượng học tính bằng phút');
-            $table->boolean('is_mandatory')->default(false);
+            $table->enum('format', ['Online', 'Offline', 'Hybrid'])->default('Offline');
+            $table->integer('duration')->nullable(); // Tính bằng giờ
+            $table->text('content')->nullable();
+            $table->text('description')->nullable();
+            $table->text('reason')->nullable(); // Lý do tạo (nếu tự đề xuất)
             
-            // THÊM MỚI TỪ MOCKUP
-            $table->enum('source_type', ['request', 'internal'])->default('internal')->comment('Nguồn gốc khóa học');
-            $table->string('internal_reason')->nullable()->comment('Lý do tự đề xuất');
+            // Trạng thái theo BA: Chưa có lớp, Đang triển khai, Đang mở, Đã kết thúc
+            $table->string('status')->default('Chưa có lớp');
             
-            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
-            $table->softDeletes(); 
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 
