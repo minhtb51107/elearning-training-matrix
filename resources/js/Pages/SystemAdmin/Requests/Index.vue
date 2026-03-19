@@ -1,48 +1,65 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, watch } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 
-// MOCK DATA: Chép chính xác 100% từ thiết kế của bạn
-const allRequests = ref([
-    { id: 1, code: 'YC-2026-000001', department: 'Kinh doanh', course: 'Kỹ năng bán hàng', hours: '8h', date: '12/01/2026', processed_date: '', status: 'Cần duyệt' },
-    { id: 2, code: 'YC-2026-000002', department: 'IT', course: 'Bảo mật thông tin', hours: '6h', date: '11/01/2026', processed_date: '', status: 'Cần duyệt' },
-    { id: 3, code: 'YC-2026-000003', department: 'Kế toán', course: 'Cập nhật chính sách thuế', hours: '3h', date: '10/01/2026', processed_date: '10/01/2026', status: 'Từ chối' },
-    { id: 4, code: 'YC-2026-000004', department: 'Nhân sự', course: 'Kỹ năng phỏng vấn', hours: '4h', date: '06/01/2026', processed_date: '08/01/2026', status: 'Đã duyệt' },
-    { id: 5, code: 'YC-2026-000005', department: 'Kinh doanh', course: 'Kỹ năng chăm sóc KH', hours: '6h', date: '07/01/2026', processed_date: '09/01/2026', status: 'Đã duyệt' },
-    { id: 6, code: 'YC-2026-000006', department: 'IT', course: 'Lập trình Spring Boot', hours: '12h', date: '08/01/2026', processed_date: '', status: 'Cần duyệt' },
-    { id: 7, code: 'YC-2026-000007', department: 'Marketing', course: 'Digital Marketing', hours: '8h', date: '08/01/2026', processed_date: '10/01/2026', status: 'Từ chối' },
-    { id: 8, code: 'YC-2026-000008', department: 'Kho vận', course: 'An toàn lao động', hours: '4h', date: '09/01/2026', processed_date: '', status: 'Cần duyệt' },
-    { id: 9, code: 'YC-2026-000009', department: 'Kinh doanh', course: 'Kỹ năng đàm phán', hours: '6h', date: '10/01/2026', processed_date: '', status: 'Cần duyệt' },
-    { id: 10, code: 'YC-2026-000010', department: 'IT', course: 'Quản lý dự án Agile', hours: '8h', date: '10/01/2026', processed_date: '12/01/2026', status: 'Đã duyệt' },
-    { id: 11, code: 'YC-2026-000011', department: 'Nhân sự', course: 'Kỹ năng đào tạo', hours: '6h', date: '11/01/2026', processed_date: '', status: 'Cần duyệt' },
-]);
-
-// Xử lý Logic chuyển Tab
-const activeTab = ref('Tất Cả');
-
-const tabs = computed(() => {
-    return [
-        { name: 'Tất Cả', count: allRequests.value.length },
-        { name: 'Đã duyệt', count: allRequests.value.filter(r => r.status === 'Đã duyệt').length },
-        { name: 'Cần duyệt', count: allRequests.value.filter(r => r.status === 'Cần duyệt').length },
-        { name: 'Đã xử lý', count: allRequests.value.filter(r => r.status === 'Đã xử lý').length },
-        { name: 'Từ chối', count: allRequests.value.filter(r => r.status === 'Từ chối').length },
-    ];
+// Nhận dữ liệu THẬT từ backend thay vì mock
+const props = defineProps({
+    requests: Object,
+    filters: Object,
 });
 
-const filteredRequests = computed(() => {
-    if (activeTab.value === 'Tất Cả') return allRequests.value;
-    return allRequests.value.filter(r => r.status === activeTab.value);
+// Form tìm kiếm / Lọc tab
+const searchForm = ref({
+    tab: props.filters?.tab || 'all',
 });
+
+// Tự động load dữ liệu khi đổi Tab
+watch(() => searchForm.value.tab, (newTab) => {
+    router.get(route('system.requests.index'), { tab: newTab }, { preserveState: true, replace: true, preserveScroll: true });
+});
+
+const tabs = [
+    { id: 'all', name: 'Tất Cả' },
+    { id: 'approved', name: 'Đã duyệt' },
+    { id: 'pending', name: 'Cần duyệt' },
+    { id: 'processed', name: 'Đã xử lý' },
+    { id: 'rejected', name: 'Từ chối' },
+];
+
+// Xử lý logic Đổi trạng thái trực tiếp trên bảng
+const updateStatus = (id, status) => {
+    let feedback = '';
+    // Nếu bấm Từ chối, bắt buộc nhập lý do bằng popup native (rất tiện lợi cho UX Admin)
+    if (status === 'rejected') {
+        feedback = prompt('Vui lòng nhập lý do từ chối yêu cầu này:');
+        if (feedback === null || feedback.trim() === '') {
+            alert('Bạn phải nhập lý do để từ chối!');
+            return;
+        }
+    }
+
+    if (confirm(status === 'approved' ? 'Xác nhận DUYỆT yêu cầu này?' : 'Xác nhận TỪ CHỐI yêu cầu này?')) {
+        router.put(route('system.requests.update-status', id), {
+            status: status,
+            hr_feedback: feedback
+        }, { preserveScroll: true });
+    }
+};
+
+// Map trạng thái DB sang Tiếng Việt
+const formatStatus = (status) => {
+    const labels = { 'pending': 'Cần duyệt', 'approved': 'Đã duyệt', 'processed': 'Đã xử lý', 'rejected': 'Từ chối' };
+    return labels[status] || status;
+};
 
 // Xử lý màu sắc Text trạng thái
 const getStatusClass = (status) => {
     const classes = {
-        'Cần duyệt': 'text-[#d97706] font-bold', // Vàng cam
-        'Đã duyệt': 'text-[#16a34a] font-bold',  // Xanh lá
-        'Đã xử lý': 'text-[#0d9488] font-bold',  // Xanh ngọc
-        'Từ chối': 'text-[#dc2626] font-bold',   // Đỏ
+        'pending': 'text-[#d97706] font-bold', // Vàng cam
+        'approved': 'text-[#16a34a] font-bold',  // Xanh lá
+        'processed': 'text-[#0d9488] font-bold', // Xanh ngọc
+        'rejected': 'text-[#dc2626] font-bold',  // Đỏ
     };
     return classes[status] || 'text-gray-800';
 };
@@ -54,20 +71,28 @@ const getStatusClass = (status) => {
     <AuthenticatedLayout>
         <div class="py-6">
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+                
+                <div v-if="$page.props.flash?.success" class="mb-4 bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded shadow-sm">
+                    {{ $page.props.flash.success }}
+                </div>
+                <div v-if="$page.props.flash?.error" class="mb-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded shadow-sm">
+                    {{ $page.props.flash.error }}
+                </div>
+
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6 border border-gray-200">
                     
                     <h2 class="text-2xl font-bold text-gray-800 mb-8">Yêu cầu đào tạo</h2>
 
                     <div class="flex justify-center items-center gap-4 mb-10 text-[15px]">
-                        <template v-for="(tab, index) in tabs" :key="tab.name">
+                        <template v-for="(tab, index) in tabs" :key="tab.id">
                             <button 
-                                @click="activeTab = tab.name"
+                                @click="searchForm.tab = tab.id"
                                 :class="[
                                     'transition', 
-                                    activeTab === tab.name ? 'text-gray-900 font-extrabold border-b-2 border-gray-900 pb-0.5' : 'text-gray-500 hover:text-gray-800 font-medium'
+                                    searchForm.tab === tab.id ? 'text-gray-900 font-extrabold border-b-2 border-gray-900 pb-0.5' : 'text-gray-500 hover:text-gray-800 font-medium'
                                 ]"
                             >
-                                {{ tab.name }} ({{ tab.count }})
+                                {{ tab.name }}
                             </button>
                             <span v-if="index < tabs.length - 1" class="text-gray-300 font-bold">|</span>
                         </template>
@@ -76,10 +101,10 @@ const getStatusClass = (status) => {
                     <div class="flex justify-between items-end mb-4">
                         <h3 class="text-lg font-bold text-gray-800">Danh sách yêu cầu:</h3>
                         
-                        <button v-if="activeTab === 'Cần duyệt'" class="bg-[#b7eb8f] hover:bg-[#95de64] text-gray-900 border border-[#95de64] px-4 py-1.5 rounded text-sm font-bold shadow-sm transition">
+                        <button v-if="searchForm.tab === 'pending'" class="bg-[#b7eb8f] hover:bg-[#95de64] text-gray-900 border border-[#95de64] px-4 py-1.5 rounded text-sm font-bold shadow-sm transition">
                             Duyệt tất cả
                         </button>
-                        <button v-if="activeTab === 'Đã duyệt'" class="bg-[#fcd38e] hover:bg-[#ffd666] text-gray-900 border border-[#faad14] px-4 py-1.5 rounded text-sm font-bold shadow-sm transition">
+                        <button v-if="searchForm.tab === 'approved'" class="bg-[#fcd38e] hover:bg-[#ffd666] text-gray-900 border border-[#faad14] px-4 py-1.5 rounded text-sm font-bold shadow-sm transition">
                             + Tạo khóa học
                         </button>
                     </div>
@@ -102,41 +127,46 @@ const getStatusClass = (status) => {
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-300">
-                                <tr v-if="filteredRequests.length === 0">
+                                <tr v-if="!requests || !requests.data || requests.data.length === 0">
                                     <td colspan="9" class="px-4 py-8 text-center text-gray-500 italic">Không có dữ liệu trong mục này.</td>
                                 </tr>
-                                <tr v-for="req in filteredRequests" :key="req.id" class="hover:bg-gray-50 transition cursor-pointer" @click="router.get(route('system.requests.show', req.id))">
+                                
+                                <tr v-for="req in requests.data" :key="req.id" class="hover:bg-gray-50 transition cursor-pointer" @click="router.get(route('system.requests.show', req.id))">
                                     <td class="px-3 py-3 border-r border-gray-300">
                                         <input @click.stop type="checkbox" class="rounded border-gray-400 text-blue-600 focus:ring-blue-500">
                                     </td>
                                     <td class="px-3 py-3 border-r border-gray-300 text-gray-700">{{ req.code }}</td>
-                                    <td class="px-3 py-3 border-r border-gray-300 text-gray-800">{{ req.department }}</td>
-                                    <td class="px-3 py-3 border-r border-gray-300 text-gray-800 text-left" :class="{ 'text-blue-600': req.status !== 'Cần duyệt' && req.status !== 'Từ chối' }">
-                                        {{ req.course }}
+                                    <td class="px-3 py-3 border-r border-gray-300 text-gray-800">{{ req.department?.name }}</td>
+                                    
+                                    <td class="px-3 py-3 border-r border-gray-300 text-gray-800 text-left" :class="{ 'text-blue-600': req.status !== 'pending' && req.status !== 'rejected' }">
+                                        {{ req.course_name }}
                                     </td>
-                                    <td class="px-3 py-3 border-r border-gray-300 text-gray-700">{{ req.hours }}</td>
-                                    <td class="px-3 py-3 border-r border-gray-300 text-gray-700">{{ req.date }}</td>
-                                    <td class="px-3 py-3 border-r border-gray-300 text-gray-700">{{ req.processed_date }}</td>
+                                    
+                                    <td class="px-3 py-3 border-r border-gray-300 text-gray-700">{{ req.expected_duration }}h</td>
+                                    <td class="px-3 py-3 border-r border-gray-300 text-gray-700">{{ new Date(req.created_at).toLocaleDateString('vi-VN') }}</td>
+                                    <td class="px-3 py-3 border-r border-gray-300 text-gray-700">
+                                        {{ req.status !== 'pending' ? new Date(req.updated_at).toLocaleDateString('vi-VN') : '--' }}
+                                    </td>
                                     
                                     <td class="px-3 py-3 border-r border-gray-300" :class="getStatusClass(req.status)">
-                                        {{ req.status }}
+                                        {{ formatStatus(req.status) }}
                                     </td>
                                     
                                     <td class="px-2 py-3 min-w-[120px]">
-                                        <div v-if="req.status === 'Cần duyệt'" class="flex justify-center gap-1">
-                                            <button @click.stop class="bg-[#b7eb8f] hover:bg-[#95de64] text-gray-900 border border-[#95de64] px-2 py-1 rounded text-xs font-semibold shadow-sm transition">Duyệt</button>
-                                            <button @click.stop class="bg-[#ff4d4f] hover:bg-[#f5222d] text-white border border-[#ff4d4f] px-2 py-1 rounded text-xs font-semibold shadow-sm transition">Từ chối</button>
+                                        <div v-if="req.status === 'pending'" class="flex justify-center gap-1">
+                                            <button @click.stop="updateStatus(req.id, 'approved')" class="bg-[#b7eb8f] hover:bg-[#95de64] text-gray-900 border border-[#95de64] px-2 py-1 rounded text-xs font-semibold shadow-sm transition">Duyệt</button>
+                                            <button @click.stop="updateStatus(req.id, 'rejected')" class="bg-[#ff4d4f] hover:bg-[#f5222d] text-white border border-[#ff4d4f] px-2 py-1 rounded text-xs font-semibold shadow-sm transition">Từ chối</button>
                                         </div>
                                         
-                                        <div v-else-if="req.status === 'Đã duyệt'" class="flex justify-center">
-                                            <button @click.stop class="bg-[#fcd38e] hover:bg-[#ffd666] text-gray-900 border border-[#faad14] px-3 py-1 rounded text-xs font-semibold shadow-sm transition">
+                                        <div v-else-if="req.status === 'approved'" class="flex justify-center">
+                                            <button @click.stop="router.get(route('system.courses.create', { request_id: req.id }))" class="bg-[#fcd38e] hover:bg-[#ffd666] text-gray-900 border border-[#faad14] px-3 py-1 rounded text-xs font-semibold shadow-sm transition">
                                                 + Tạo khóa học
                                             </button>
                                         </div>
                                         
-                                        <div v-else-if="req.status === 'Từ chối' || req.status === 'Đã xử lý'" class="flex justify-center">
+                                        <div v-else-if="req.status === 'rejected' || req.status === 'processed'" class="flex justify-center">
                                             <Link @click.stop :href="route('system.requests.show', req.id)" class="text-[#0ea5e9] hover:underline text-sm font-medium">
-                                                {{ req.status === 'Đã xử lý' ? 'Xem khóa học' : 'Xem chi tiết' }}
+                                                {{ req.status === 'processed' ? 'Xem khóa học' : 'Xem chi tiết' }}
                                             </Link>
                                         </div>
                                     </td>
@@ -145,12 +175,17 @@ const getStatusClass = (status) => {
                         </table>
                     </div>
 
-                    <div class="mt-8 flex justify-center items-center gap-4 text-sm text-[#0ea5e9] font-medium">
-                        <button class="hover:underline">&lt; Prev</button>
-                        <button class="w-7 h-7 rounded bg-blue-100 font-bold flex items-center justify-center">1</button>
-                        <button class="w-7 h-7 rounded hover:bg-gray-100 flex items-center justify-center text-gray-600">2</button>
-                        <button class="w-7 h-7 rounded hover:bg-gray-100 flex items-center justify-center text-gray-600">3</button>
-                        <button class="hover:underline">Next &gt;</button>
+                    <div v-if="requests?.links?.length > 3" class="mt-8 flex justify-center items-center gap-2 text-sm text-[#0ea5e9] font-medium">
+                        <template v-for="(link, index) in requests.links" :key="index">
+                            <Link 
+                                v-if="link.url"
+                                :href="link.url" 
+                                class="w-7 h-7 rounded flex items-center justify-center transition"
+                                :class="link.active ? 'bg-blue-100 font-bold text-gray-900' : 'hover:bg-gray-100 text-gray-600'"
+                                v-html="link.label"
+                            />
+                            <span v-else class="w-7 h-7 flex items-center justify-center text-gray-400" v-html="link.label"></span>
+                        </template>
                     </div>
 
                 </div>

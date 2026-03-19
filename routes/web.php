@@ -21,18 +21,13 @@ Route::middleware('auth')->group(function () {
     // ==============================================================
     // CỤM ROUTE DÀNH CHO ADMIN PHÒNG BAN (ROLE 2)
     // ==============================================================
-    // ==============================================================
-    // CỤM ROUTE DÀNH CHO ADMIN PHÒNG BAN (ROLE 2)
-    // ==============================================================
     Route::prefix('department')->name('department.')->group(function () {
         Route::get('/requests', [TrainingRequestController::class, 'index'])->name('requests.index');
         Route::get('/requests/create', [TrainingRequestController::class, 'create'])->name('requests.create');
         
-        // 👇 THÊM 2 ROUTE NÀY ĐỂ XỬ LÝ LƯU VÀ CẬP NHẬT FORM 👇
+        // XỬ LÝ LƯU VÀ CẬP NHẬT FORM
         Route::post('/requests', [TrainingRequestController::class, 'store'])->name('requests.store');
         Route::put('/requests/{trainingRequest}', [TrainingRequestController::class, 'update'])->name('requests.update');
-        
-        // 👇 SỬA LẠI {id} THÀNH {trainingRequest} ĐỂ MATCH VỚI CONTROLLER 👇
         Route::get('/requests/{trainingRequest}', [TrainingRequestController::class, 'show'])->name('requests.show');
         
         Route::get('/courses', function () { return Inertia::render('DepartmentAdmin/Courses/Index'); })->name('courses.index');
@@ -44,8 +39,11 @@ Route::middleware('auth')->group(function () {
     // CỤM ROUTE DÀNH CHO ADMIN HỆ THỐNG (ROLE 1)
     // ==============================================================
     Route::prefix('system')->name('system.')->group(function () {
-        Route::get('/requests', function () { return Inertia::render('SystemAdmin/Requests/Index'); })->name('requests.index');
-        Route::get('/requests/{id}', function () { return Inertia::render('SystemAdmin/Requests/Show'); })->name('requests.show');
+        // 👇 ĐÃ TRỎ SANG CONTROLLER MỚI CỦA SYSTEM ADMIN VÀ THÊM ROUTE UPDATE STATUS 👇
+        Route::get('/requests', [\App\Http\Controllers\SystemAdmin\TrainingRequestController::class, 'index'])->name('requests.index');
+        Route::get('/requests/{trainingRequest}', [\App\Http\Controllers\SystemAdmin\TrainingRequestController::class, 'show'])->name('requests.show');
+        Route::put('/requests/{trainingRequest}/status', [\App\Http\Controllers\SystemAdmin\TrainingRequestController::class, 'updateStatus'])->name('requests.update-status');
+        
         Route::get('/courses', function () { return Inertia::render('SystemAdmin/Courses/Index'); })->name('courses.index');
         Route::get('/courses/create', function () { return Inertia::render('SystemAdmin/Courses/Create'); })->name('courses.create');
         Route::get('/courses/{id}/statistics', function () { return Inertia::render('SystemAdmin/Courses/Statistics'); })->name('courses.statistics');
@@ -68,7 +66,6 @@ Route::middleware('auth')->group(function () {
         Route::get('/my-classes', function () { return Inertia::render('Employee/MyClasses/Index'); })->name('my-classes');
         Route::get('/my-schedule', function () { return Inertia::render('Employee/MySchedule/Index'); })->name('my-schedule');
         
-        // 👇 THÊM 2 ROUTE NÀY CHO KẾT QUẢ VÀ TÀI KHOẢN 👇
         Route::get('/results', function () { return Inertia::render('Employee/Results/Index'); })->name('results');
         Route::get('/account', function () { return Inertia::render('Employee/Account/Index'); })->name('account');
     });
