@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 
@@ -8,7 +8,6 @@ const props = defineProps({
     filters: Object,
 });
 
-// Form tìm kiếm dùng manual (Bấm nút mới tìm) thay vì tự động
 const searchForm = ref({
     keyword: props.filters?.keyword || '',
     start_date: props.filters?.start_date || '',
@@ -16,11 +15,29 @@ const searchForm = ref({
     status: props.filters?.status || '',
 });
 
+// Nút submit thủ công (vẫn giữ lại nếu người dùng thích bấm)
 const submitSearch = () => {
-    router.get(route('department.requests.index'), searchForm.value, { preserveState: true, replace: true });
+    router.get(route('department.requests.index'), searchForm.value, { 
+        preserveState: true, 
+        replace: true,
+        preserveScroll: true 
+    });
 };
 
-// Đổ màu full ô (Cell) theo đúng màu của Mockup
+// Tự động lọc sau khi ngừng gõ/chọn 300ms
+let searchTimeout = null;
+watch(searchForm, (newValue) => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        router.get(route('department.requests.index'), newValue, {
+            preserveState: true, 
+            replace: true, 
+            preserveScroll: true 
+        });
+    }, 300);
+}, { deep: true });
+
+// Đổ màu full ô (Cell)
 const getStatusBgClass = (status) => {
     const classes = {
         'draft': 'bg-white text-gray-800',
@@ -63,8 +80,8 @@ const getStatusLabel = (status) => {
                         <label class="block text-sm font-medium text-gray-700 mb-2">Tìm kiếm:</label>
                         <div class="flex flex-wrap items-end gap-4">
                             <div class="flex-1 min-w-[200px]">
-                                <label class="block text-sm text-gray-600 mb-1">Khóa học:</label>
-                                <input v-model="searchForm.keyword" type="text" class="w-full border-gray-400 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Nhập và chọn" />
+                                <label class="block text-sm text-gray-600 mb-1">Khóa học / Mã YC:</label>
+                                <input v-model="searchForm.keyword" type="text" class="w-full border-gray-400 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Nhập tên hoặc mã..." />
                             </div>
                             <div class="w-36">
                                 <label class="block text-sm text-gray-600 mb-1">Từ ngày:</label>
@@ -117,7 +134,7 @@ const getStatusLabel = (status) => {
                                         {{ req.content }}
                                     </td>
                                     
-                                    <td class="px-4 py-3 text-sm border-r border-gray-400 text-gray-700">{{ req.expected_duration || '--' }}</td>
+                                    <td class="px-4 py-3 text-sm border-r border-gray-400 text-gray-700">{{ req.expected_duration ? req.expected_duration + ' giờ' : '--' }}</td>
                                     <td class="px-4 py-3 text-sm border-r border-gray-400 text-gray-700">{{ new Date(req.created_at).toLocaleDateString('vi-VN') }}</td>
                                     
                                     <td :class="['px-4 py-3 text-sm font-medium border-l border-gray-400', getStatusBgClass(req.status)]">

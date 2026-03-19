@@ -16,14 +16,23 @@ class TrainingRequestController extends Controller
         
         $query = TrainingRequest::where('department_id', $user->department_id)->latest();
 
-        // Xử lý bộ lọc (Filters) từ Mockup
+        // Xử lý bộ lọc (Filters)
         if ($request->filled('keyword')) {
-            $query->where('course_name', 'like', '%' . $request->keyword . '%');
+            // Tìm kiếm trên cả Tên khóa học HOẶC Mã yêu cầu
+            $query->where(function($q) use ($request) {
+                $q->where('course_name', 'like', '%' . $request->keyword . '%')
+                  ->orWhere('code', 'like', '%' . $request->keyword . '%');
+            });
         }
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
-        // Thêm lọc Từ ngày - Đến ngày ở đây nếu cần...
+        if ($request->filled('start_date')) {
+            $query->whereDate('created_at', '>=', $request->start_date);
+        }
+        if ($request->filled('end_date')) {
+            $query->whereDate('created_at', '<=', $request->end_date);
+        }
 
         $requests = $query->paginate(10)->withQueryString();
 
@@ -37,7 +46,6 @@ class TrainingRequestController extends Controller
     public function create(Request $request)
     {
         return Inertia::render('DepartmentAdmin/Requests/Create', [
-            // Gửi xuống tên Phòng ban và Tên người gửi để làm field readonly theo mockup
             'department_name' => $request->user()->department->name ?? 'Chưa cập nhật',
             'requester_name' => $request->user()->name
         ]);
@@ -50,12 +58,11 @@ class TrainingRequestController extends Controller
             'course_name' => 'required|string|max:255',
             'target_audience' => 'required|string|max:255',
             'content' => 'required|string',
-            'expected_duration' => 'nullable|string|max:255',
+            'expected_duration' => 'required|integer|min:1',
             'notes' => 'nullable|string',
-            'action' => 'required|in:draft,pending' // Nút bấm là Lưu nháp hay Gửi
+            'action' => 'required|in:draft,pending'
         ]);
 
-        // Tạo mã YC tự động (VD: YC-2026-0001)
         $year = date('Y');
         $count = TrainingRequest::whereYear('created_at', $year)->count() + 1;
         $code = 'YC-' . $year . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
@@ -69,17 +76,16 @@ class TrainingRequestController extends Controller
             'content' => $validated['content'],
             'expected_duration' => $validated['expected_duration'],
             'notes' => $validated['notes'],
-            'status' => $validated['action'] // 'draft' hoặc 'pending'
+            'status' => $validated['action']
         ]);
 
         $message = $validated['action'] === 'draft' ? 'Đã lưu bản nháp!' : 'Đã gửi yêu cầu đào tạo thành công!';
         return redirect()->route('department.requests.index')->with('success', $message);
     }
 
-    // 4. Màn hình Xem chi tiết (Hoặc Sửa nếu đang là Nháp)
+    // 4. Màn hình Xem chi tiết
     public function show(Request $request, TrainingRequest $trainingRequest)
     {
-        // Kiểm tra bảo mật: Không cho xem YC của phòng khác
         if ($trainingRequest->department_id !== $request->user()->department_id) {
             abort(403, 'Bạn không có quyền truy cập yêu cầu này.');
         }
@@ -99,11 +105,10 @@ class TrainingRequestController extends Controller
         }
 
         $validated = $request->validate([
-            // ... validation giống method store
             'course_name' => 'required|string|max:255',
             'target_audience' => 'required|string|max:255',
             'content' => 'required|string',
-            'expected_duration' => 'nullable|string|max:255',
+            'expected_duration' => 'required|integer|min:1',
             'notes' => 'nullable|string',
             'action' => 'required|in:draft,pending'
         ]);

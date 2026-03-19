@@ -41,6 +41,11 @@ const getStatusLabel = (status) => {
 
         <div class="py-12">
             <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
+                
+                <div v-if="$page.props.flash?.error" class="mb-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded shadow-sm">
+                    {{ $page.props.flash.error }}
+                </div>
+
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-8">
                     
                     <div class="bg-gray-200 p-6 rounded-md mb-6 border border-gray-400">
@@ -59,12 +64,13 @@ const getStatusLabel = (status) => {
                     <form @submit.prevent>
                         <div class="grid grid-cols-2 gap-6 mb-4">
                             <div>
-                                <label class="block text-sm font-bold text-gray-700">Tên khóa học:</label>
-                                <input v-model="form.course_name" type="text" :disabled="!isDraft" class="mt-1 block w-full border-gray-300 rounded-md disabled:bg-gray-100 disabled:text-gray-600">
+                                <label class="block text-sm font-bold text-gray-700">Tên khóa học <span v-if="isDraft" class="text-red-500">*</span>:</label>
+                                <input v-model="form.course_name" type="text" :disabled="!isDraft" :required="isDraft" class="mt-1 block w-full border-gray-300 rounded-md disabled:bg-gray-100 disabled:text-gray-600">
+                                <div v-if="form.errors.course_name" class="text-red-500 text-xs mt-1">{{ form.errors.course_name }}</div>
                             </div>
                             <div>
-                                <label class="block text-sm font-bold text-gray-700">Đối tượng / Phạm vi:</label>
-                                <select v-model="form.target_audience" :disabled="!isDraft" class="mt-1 block w-full border-gray-300 rounded-md disabled:bg-gray-100 disabled:text-gray-600">
+                                <label class="block text-sm font-bold text-gray-700">Đối tượng / Phạm vi <span v-if="isDraft" class="text-red-500">*</span>:</label>
+                                <select v-model="form.target_audience" :disabled="!isDraft" :required="isDraft" class="mt-1 block w-full border-gray-300 rounded-md disabled:bg-gray-100 disabled:text-gray-600">
                                     <option value="Toàn phòng">Toàn phòng</option>
                                     <option value="Cấp quản lý">Cấp quản lý</option>
                                     <option value="Nhân viên mới">Nhân viên mới</option>
@@ -75,13 +81,15 @@ const getStatusLabel = (status) => {
 
                         <div class="grid grid-cols-2 gap-6 mb-6">
                             <div>
-                                <label class="block text-sm font-bold text-gray-700">Nội dung đào tạo:</label>
-                                <textarea v-model="form.content" rows="4" :disabled="!isDraft" class="mt-1 block w-full border-gray-300 rounded-md disabled:bg-gray-100 disabled:text-gray-600"></textarea>
+                                <label class="block text-sm font-bold text-gray-700">Nội dung đào tạo <span v-if="isDraft" class="text-red-500">*</span>:</label>
+                                <textarea v-model="form.content" rows="4" :disabled="!isDraft" :required="isDraft" class="mt-1 block w-full border-gray-300 rounded-md disabled:bg-gray-100 disabled:text-gray-600"></textarea>
+                                <div v-if="form.errors.content" class="text-red-500 text-xs mt-1">{{ form.errors.content }}</div>
                             </div>
                             <div>
                                 <div class="mb-4">
-                                    <label class="block text-sm font-bold text-gray-700">Thời lượng dự kiến:</label>
-                                    <input v-model="form.expected_duration" type="text" :disabled="!isDraft" class="mt-1 block w-full border-gray-300 rounded-md disabled:bg-gray-100 disabled:text-gray-600">
+                                    <label class="block text-sm font-bold text-gray-700">Thời lượng dự kiến (Giờ) <span v-if="isDraft" class="text-red-500">*</span>:</label>
+                                    <input v-model="form.expected_duration" type="number" min="1" :disabled="!isDraft" :required="isDraft" class="mt-1 block w-full border-gray-300 rounded-md disabled:bg-gray-100 disabled:text-gray-600" placeholder="VD: 8">
+                                    <div v-if="form.errors.expected_duration" class="text-red-500 text-xs mt-1">{{ form.errors.expected_duration }}</div>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-bold text-gray-700">Ghi chú thêm:</label>

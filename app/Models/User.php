@@ -45,4 +45,13 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+    public function department() {
+    return $this->belongsTo(Department::class);
+}
+
+// Lấy danh sách lớp nhân viên này đã đăng ký
+public function enrollments() {
+    return $this->hasMany(ClassEnrollment::class);
+}
 }

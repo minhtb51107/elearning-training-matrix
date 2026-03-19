@@ -75,8 +75,9 @@ const submitForm = (actionType) => {
                             </div>
                             <div>
                                 <div class="mb-4">
-                                    <label class="block text-sm font-medium text-gray-700">Thời lượng dự kiến</label>
-                                    <input v-model="form.expected_duration" type="text" class="mt-1 block w-full border-gray-300 rounded-md" placeholder="VD: 8 giờ, 2 ngày...">
+                                    <label class="block text-sm font-medium text-gray-700">Thời lượng dự kiến (Giờ) <span class="text-red-500">*</span></label>
+                                    <input v-model="form.expected_duration" type="number" min="1" class="mt-1 block w-full border-gray-300 rounded-md" placeholder="VD: 8" required>
+                                    <div v-if="form.errors.expected_duration" class="text-red-500 text-xs mt-1">{{ form.errors.expected_duration }}</div>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700">Ghi chú thêm (nếu có)</label>
