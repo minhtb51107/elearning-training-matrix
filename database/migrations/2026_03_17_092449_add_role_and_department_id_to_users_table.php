@@ -9,14 +9,13 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            // Role: 1 = Admin Hệ thống, 2 = Admin Phòng ban, 3 = Nhân viên
             $table->tinyInteger('role')->default(3)->after('password');
-            
-            // Khóa ngoại nối sang bảng departments
             $table->foreignId('department_id')->nullable()->constrained('departments')->nullOnDelete()->after('role');
-            
-            // Mã nhân viên
             $table->string('employee_code')->unique()->nullable()->after('id');
+            
+            // THÊM MỚI TỪ MOCKUP
+            $table->string('position')->nullable()->after('department_id')->comment('Chức vụ: Nhân viên, Team Lead...');
+            $table->string('training_status')->default('Chưa đạt yêu cầu')->after('position');
         });
     }
 
@@ -24,7 +23,7 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
             $table->dropForeign(['department_id']);
-            $table->dropColumn(['role', 'department_id', 'employee_code']);
+            $table->dropColumn(['role', 'department_id', 'employee_code', 'position', 'training_status']);
         });
     }
 };
