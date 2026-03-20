@@ -106,6 +106,7 @@ class CourseController extends Controller
             $count = Course::count() + 1;
             $code = 'KH-' . date('Y') . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
 
+            // 1. Tạo Khóa học
             $course = Course::create([
                 'code' => $code,
                 'name' => $validated['name'],
@@ -118,11 +119,29 @@ class CourseController extends Controller
                 'status' => 'Chưa có lớp'
             ]);
 
+            // 2. Xử lý Yêu cầu đào tạo & Phân bổ Phòng ban
             if (!empty($validated['request_ids'])) {
+                // Cập nhật trạng thái Yêu cầu
                 TrainingRequest::whereIn('id', $validated['request_ids'])->update([
                     'status' => 'processed',
                     'course_id' => $course->id
                 ]);
+
+                // Tự động lấy danh sách ID của các Phòng ban đã gửi yêu cầu này
+                $deptIds = TrainingRequest::whereIn('id', $validated['request_ids'])
+                                ->pluck('department_id')
+                                ->filter()
+                                ->unique()
+                                ->toArray();
+                
+                // Gắn khóa học cho các phòng ban đó
+                if (!empty($deptIds)) {
+                    $course->departments()->sync($deptIds);
+                }
+            } else {
+                // Nếu tạo thủ công (Nội bộ), mặc định cho phép TẤT CẢ phòng ban đều thấy khóa học này
+                $allDeptIds = Department::pluck('id')->toArray();
+                $course->departments()->sync($allDeptIds);
             }
 
             DB::commit();

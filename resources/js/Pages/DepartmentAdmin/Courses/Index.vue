@@ -1,21 +1,54 @@
 <script setup>
 import { ref } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, Link, router } from '@inertiajs/vue3'; // Đã thêm router ở đây
+import { Head, Link, router } from '@inertiajs/vue3';
 
-// MOCK DATA: Chép chính xác 100% từ thiết kế của bạn
-const mockCourses = ref([
-    { code: 'KH001', name: 'Kỹ năng bán hàng', request_date: '', format: 'Offline', start_date: '', classes: 2, status: 'Đang mở' },
-    { code: 'KH002', name: 'An toàn lao động', request_date: '', format: 'Online', start_date: '', classes: 1, status: 'Đang triển khai' },
-    { code: 'KH003', name: 'Excel nâng cao', request_date: '', format: 'Blended', start_date: '', classes: 3, status: 'Kết thúc' },
-]);
+const props = defineProps({
+    courses: Object,
+    filters: Object
+});
 
-// Đổ màu full ô theo đúng mockup
-const getStatusBgClass = (status) => {
+// BIẾN CHO BỘ LỌC
+const searchKeyword = ref(props.filters?.keyword || '');
+const filterFromDate = ref(props.filters?.from_date || '');
+const filterToDate = ref(props.filters?.to_date || '');
+const filterFormat = ref(props.filters?.format || 'all');
+const filterStatus = ref(props.filters?.status || 'all');
+
+const doSearch = () => {
+    router.get(route('department.courses.index'), {
+        keyword: searchKeyword.value,
+        from_date: filterFromDate.value,
+        to_date: filterToDate.value,
+        format: filterFormat.value,
+        status: filterStatus.value
+    }, { preserveState: true, replace: true });
+};
+
+// HELPER: Format Ngày tháng (từ DB ra DD/MM/YYYY)
+const formatDate = (dateString) => {
+    if (!dateString) return '--';
+    const d = new Date(dateString);
+    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+};
+
+// HELPER: Dịch Trạng thái từ Database ra Tiếng Việt
+const getStatusText = (status) => {
+    const map = {
+        'published': 'Đang mở',
+        'draft': 'Đang triển khai',
+        'archived': 'Kết thúc'
+    };
+    return map[status] || status;
+};
+
+// HELPER: Đổ màu full ô theo đúng mockup
+const getStatusBgClass = (dbStatus) => {
+    const status = getStatusText(dbStatus);
     if (status === 'Đang mở') return 'bg-[#b7eb8f] text-gray-900'; // Xanh lá nhạt
     if (status === 'Đang triển khai') return 'bg-[#fffb8f] text-gray-900'; // Vàng nhạt
     if (status === 'Kết thúc') return 'bg-[#ff4d4f] text-white'; // Đỏ
-    return 'bg-white text-gray-800';
+    return 'bg-gray-100 text-gray-800';
 };
 </script>
 
@@ -33,21 +66,21 @@ const getStatusBgClass = (status) => {
                         <label class="block text-base font-bold text-gray-800 mb-2">Bộ lọc:</label>
                         <div class="flex flex-wrap items-end gap-4">
                             <div class="flex-1 min-w-[200px]">
-                                <label class="block text-sm text-gray-600 mb-1">Khóa học:</label>
-                                <input type="text" class="w-full border-gray-400 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Nhập và chọn" />
+                                <label class="block text-sm text-gray-600 mb-1">Khóa học (Enter để tìm):</label>
+                                <input v-model="searchKeyword" @keyup.enter="doSearch" type="text" class="w-full border-gray-400 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Nhập tên / Mã khóa học..." />
                             </div>
                             <div class="w-36">
                                 <label class="block text-sm text-gray-600 mb-1">Từ ngày:</label>
-                                <input type="date" class="w-full border-gray-400 rounded-md text-sm text-gray-600 focus:ring-blue-500 focus:border-blue-500" />
+                                <input v-model="filterFromDate" @change="doSearch" type="date" class="w-full border-gray-400 rounded-md text-sm text-gray-600 focus:ring-blue-500 focus:border-blue-500" />
                             </div>
                             <div class="w-36">
                                 <label class="block text-sm text-gray-600 mb-1">Đến ngày:</label>
-                                <input type="date" class="w-full border-gray-400 rounded-md text-sm text-gray-600 focus:ring-blue-500 focus:border-blue-500" />
+                                <input v-model="filterToDate" @change="doSearch" type="date" class="w-full border-gray-400 rounded-md text-sm text-gray-600 focus:ring-blue-500 focus:border-blue-500" />
                             </div>
                             <div class="w-36">
                                 <label class="block text-sm text-gray-600 mb-1">Hình thức:</label>
-                                <select class="w-full border-gray-400 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500">
-                                    <option value="">Tất cả</option>
+                                <select v-model="filterFormat" @change="doSearch" class="w-full border-gray-400 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="all">Tất cả</option>
                                     <option value="offline">Offline</option>
                                     <option value="online">Online</option>
                                     <option value="blended">Blended</option>
@@ -55,11 +88,11 @@ const getStatusBgClass = (status) => {
                             </div>
                             <div class="w-40">
                                 <label class="block text-sm text-gray-600 mb-1">Trạng thái:</label>
-                                <select class="w-full border-gray-400 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500">
-                                    <option value="">Tất cả</option>
-                                    <option value="open">Đang mở</option>
-                                    <option value="in_progress">Đang triển khai</option>
-                                    <option value="completed">Kết thúc</option>
+                                <select v-model="filterStatus" @change="doSearch" class="w-full border-gray-400 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="all">Tất cả</option>
+                                    <option value="published">Đang mở</option>
+                                    <option value="draft">Đang triển khai</option>
+                                    <option value="archived">Kết thúc</option>
                                 </select>
                             </div>
                         </div>
@@ -79,33 +112,51 @@ const getStatusBgClass = (status) => {
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-400">
-                                <tr v-for="(course, index) in mockCourses" :key="index" class="hover:bg-gray-50 transition cursor-pointer" @click="router.get(route('department.courses.show', course.code))">
+                                <tr v-if="courses.data.length === 0">
+                                    <td colspan="7" class="px-4 py-6 text-center text-gray-500 italic">Không tìm thấy khóa học nào phù hợp.</td>
+                                </tr>
+                                
+                                <tr v-for="course in courses.data" :key="course.id" class="hover:bg-gray-50 transition cursor-pointer" @click="router.get(route('department.courses.show', course.id))">
                                     <td class="px-4 py-3 text-sm border-r border-gray-400 text-gray-700">{{ course.code }}</td>
-                                    <td class="px-4 py-3 text-sm border-r border-gray-400 text-gray-800">{{ course.name }}</td>
-                                    <td class="px-4 py-3 text-sm border-r border-gray-400 text-gray-600">{{ course.request_date }}</td>
-                                    <td class="px-4 py-3 text-sm border-r border-gray-400 text-gray-700">{{ course.format }}</td>
-                                    <td class="px-4 py-3 text-sm border-r border-gray-400 text-gray-700">{{ course.start_date }}</td>
-                                    <td class="px-4 py-3 text-sm border-r border-gray-400 text-gray-700">{{ course.classes }}</td>
+                                    <td class="px-4 py-3 text-sm border-r border-gray-400 text-gray-800 font-medium">{{ course.name }}</td>
+                                    <td class="px-4 py-3 text-sm border-r border-gray-400 text-gray-600">{{ formatDate(course.created_at) }}</td>
+                                    <td class="px-4 py-3 text-sm border-r border-gray-400 text-gray-700 capitalize">{{ course.format }}</td>
+                                    <td class="px-4 py-3 text-sm border-r border-gray-400 text-gray-700">--</td>
+                                    <td class="px-4 py-3 text-sm border-r border-gray-400 text-gray-700 text-center font-bold">{{ course.course_classes_count || 0 }}</td>
                                     
-                                    <td :class="['px-4 py-3 text-sm font-medium border-l border-gray-400', getStatusBgClass(course.status)]">
-                                        {{ course.status }}
+                                    <td :class="['px-4 py-3 text-[13px] font-bold border-l border-gray-400 text-center uppercase tracking-wide', getStatusBgClass(course.status)]">
+                                        {{ getStatusText(course.status) }}
                                     </td>
                                 </tr>
-                                <tr v-for="i in 3" :key="'empty-'+i">
-                                    <td class="px-4 py-6 border-r border-gray-400"></td>
-                                    <td class="px-4 py-6 border-r border-gray-400"></td>
-                                    <td class="px-4 py-6 border-r border-gray-400"></td>
-                                    <td class="px-4 py-6 border-r border-gray-400"></td>
-                                    <td class="px-4 py-6 border-r border-gray-400"></td>
-                                    <td class="px-4 py-6 border-r border-gray-400"></td>
-                                    <td class="px-4 py-6"></td>
+                                
+                                <tr v-for="i in Math.max(0, 3 - courses.data.length)" :key="'empty-'+i">
+                                    <td class="px-4 py-5 border-r border-gray-400"></td>
+                                    <td class="px-4 py-5 border-r border-gray-400"></td>
+                                    <td class="px-4 py-5 border-r border-gray-400"></td>
+                                    <td class="px-4 py-5 border-r border-gray-400"></td>
+                                    <td class="px-4 py-5 border-r border-gray-400"></td>
+                                    <td class="px-4 py-5 border-r border-gray-400"></td>
+                                    <td class="px-4 py-5"></td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
 
+                    <div class="mt-6 flex justify-center items-center gap-2 text-sm text-[#0ea5e9] font-medium" v-if="courses.links.length > 3">
+                        <Component v-for="link in courses.links" :key="link.label"
+                                   :is="link.url ? 'a' : 'span'" 
+                                   :href="link.url" 
+                                   v-html="link.label" 
+                                   class="px-3 py-1 border border-gray-300 rounded text-sm transition" 
+                                   :class="{
+                                       'bg-[#0ea5e9] text-white font-bold': link.active, 
+                                       'text-gray-400 cursor-not-allowed': !link.url,
+                                       'hover:bg-gray-100': link.url && !link.active
+                                   }" />
+                    </div>
+
                     <div class="mt-8 flex justify-center">
-                        <Link :href="route('department.requests.create')" class="text-[#d97706] hover:text-orange-700 font-bold text-[15px] uppercase tracking-wide">
+                        <Link :href="route('department.requests.create')" class="text-[#d97706] hover:text-orange-700 font-bold text-[15px] uppercase tracking-wide transition">
                             [ + GỬI YÊU CẦU ĐÀO TẠO MỚI ]
                         </Link>
                     </div>

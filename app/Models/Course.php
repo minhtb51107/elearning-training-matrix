@@ -26,4 +26,14 @@ class Course extends Model
     {
         return $this->hasMany(TrainingRequest::class);
     }
+
+    public function departments() {
+        return $this->belongsToMany(Department::class, 'course_departments');
+    }
+    
+    // Thêm hàm này để khai báo 1 Khóa học thì có nhiều Lớp học (1-N)
+    public function courseClasses()
+    {
+        return $this->hasMany(CourseClass::class);
+    }
 }

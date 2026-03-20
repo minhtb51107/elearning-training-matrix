@@ -1,46 +1,50 @@
 <script setup>
 import { ref } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head } from '@inertiajs/vue3';
+import { Head, router, usePage } from '@inertiajs/vue3';
 import Modal from '@/Components/Modal.vue';
 
-// MOCK DATA: Chép chính xác 100% từ thiết kế
-const employees = ref([
-    { 
-        id: 1, code: 'NV-2023-015', name: 'Nguyễn A', position: 'Nhân viên', status: 'Đang thực hiện', progress: '2/5',
-        email: 'a@company.com', department: 'Kinh doanh',
-        overview: { learning: 2, completed: 3 },
-        activeClasses: [
-            { name: 'Sales nâng cao - L1', status: 'Đang học' },
-            { name: 'Sales cơ bản - L1', status: 'Đang học' }
-        ]
-    },
-    { 
-        id: 2, code: 'NV-2023-016', name: 'Trần B', position: 'Trưởng nhóm', status: 'Hoàn thành', progress: '5/5',
-        email: 'b@company.com', department: 'Kinh doanh',
-        overview: { learning: 0, completed: 5 },
-        activeClasses: []
-    },
-    { 
-        id: 3, code: 'NV-2023-017', name: 'Lê C', position: 'Nhân viên', status: 'Chưa hoàn thành', progress: '0/5',
-        email: 'c@company.com', department: 'Kinh doanh',
-        overview: { learning: 0, completed: 0 },
-        activeClasses: []
-    },
-]);
+const props = defineProps({
+    employees: Object,
+    filters: Object
+});
 
-// Xử lý bật tắt Modal
+const page = usePage();
+const currentDepartment = page.props.auth.user.department?.name || 'Chưa xác định';
+
+// Gắn biến cho bộ lọc
+const searchKeyword = ref(props.filters?.keyword || '');
+const filterStatus = ref(props.filters?.status || 'all');
+
+const doSearch = () => {
+    router.get(route('department.employees.index'), { 
+        keyword: searchKeyword.value,
+        status: filterStatus.value
+    }, { preserveState: true, replace: true });
+};
+
+// QUẢN LÝ MODAL (POPUP)
 const selectedEmployee = ref(null);
 const showModal = ref(false);
 
 const openModal = (emp) => {
-    selectedEmployee.value = emp;
+    selectedEmployee.value = {
+        id: emp.id,
+        code: `NV-${String(emp.id).padStart(3, '0')}`,
+        name: emp.name,
+        position: 'Nhân viên', 
+        status: 'Đang đánh giá', 
+        progress: '-',
+        email: emp.email, 
+        department: emp.department?.name || currentDepartment,
+        overview: { learning: 0, completed: 0 },
+        activeClasses: []
+    };
     showModal.value = true;
 };
 
 const closeModal = () => {
     showModal.value = false;
-    // Đợi hiệu ứng đóng modal xong (200ms) rồi mới xóa dữ liệu để không bị giật
     setTimeout(() => selectedEmployee.value = null, 200);
 };
 </script>
@@ -54,23 +58,23 @@ const closeModal = () => {
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-8 border border-gray-200">
                     
                     <h2 class="text-xl font-bold text-gray-800 border-b pb-4">Danh sách nhân viên</h2>
-                    <h3 class="font-bold text-gray-800 mt-4 mb-6">Phòng ban: KINH DOANH</h3>
+                    <h3 class="font-bold text-gray-800 mt-4 mb-6 uppercase">Phòng ban: {{ currentDepartment }}</h3>
 
                     <div class="flex flex-wrap items-center justify-between mb-6 gap-4">
                         <div class="flex items-center gap-6">
                             <div class="flex items-center gap-2">
                                 <label class="text-sm text-gray-600 font-medium">Bộ lọc:</label>
                                 <label class="text-sm text-gray-600 ml-2">Trạng thái học:</label>
-                                <select class="border-gray-400 rounded-md text-sm py-1.5 focus:ring-blue-500 focus:border-blue-500 w-32">
-                                    <option>Tất cả</option>
-                                    <option>Đang thực hiện</option>
-                                    <option>Hoàn thành</option>
-                                    <option>Chưa hoàn thành</option>
+                                <select v-model="filterStatus" @change="doSearch" class="border-gray-400 rounded-md text-sm py-1.5 focus:ring-blue-500 focus:border-blue-500 w-32">
+                                    <option value="all">Tất cả</option>
+                                    <option value="in_progress">Đang thực hiện</option>
+                                    <option value="completed">Hoàn thành</option>
+                                    <option value="failed">Chưa hoàn thành</option>
                                 </select>
                             </div>
                             <div class="flex items-center gap-2">
-                                <label class="text-sm text-gray-600 ml-4">Từ khóa:</label>
-                                <input type="text" class="border-gray-400 rounded-md text-sm py-1.5 focus:ring-blue-500 focus:border-blue-500 w-48" placeholder="Nhập tên / Mã NV" />
+                                <label class="text-sm text-gray-600 ml-4">Từ khóa (Enter để tìm):</label>
+                                <input v-model="searchKeyword" @keyup.enter="doSearch" type="text" class="border-gray-400 rounded-md text-sm py-1.5 focus:ring-blue-500 focus:border-blue-500 w-48" placeholder="Nhập tên / Email" />
                             </div>
                         </div>
 
@@ -83,25 +87,30 @@ const closeModal = () => {
                     </div>
 
                     <div class="overflow-x-auto border border-gray-400">
-                        <table class="min-w-full divide-y divide-gray-400 text-left text-sm">
+                        <table class="min-w-full divide-y divide-gray-400 text-left text-sm text-center">
                             <thead class="bg-[#fcd38e]">
                                 <tr>
                                     <th class="px-4 py-3 font-bold text-gray-900 border-r border-gray-400 w-1/6">Mã NV</th>
-                                    <th class="px-4 py-3 font-bold text-gray-900 border-r border-gray-400 w-1/5">Họ tên</th>
+                                    <th class="px-4 py-3 font-bold text-gray-900 border-r border-gray-400 w-1/5 text-left">Họ tên</th>
                                     <th class="px-4 py-3 font-bold text-gray-900 border-r border-gray-400 w-1/6">Vị trí</th>
                                     <th class="px-4 py-3 font-bold text-gray-900 border-r border-gray-400 w-1/4">Tình trạng đào tạo</th>
                                     <th class="px-4 py-3 font-bold text-gray-900 w-1/6">Tiến độ</th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-400">
-                                <tr v-for="emp in employees" :key="emp.id" class="hover:bg-gray-50 transition cursor-pointer" @click="openModal(emp)">
-                                    <td class="px-4 py-3 border-r border-gray-400 text-gray-800">{{ emp.code }}</td>
-                                    <td class="px-4 py-3 border-r border-gray-400 text-gray-800">{{ emp.name }}</td>
-                                    <td class="px-4 py-3 border-r border-gray-400 text-gray-800">{{ emp.position }}</td>
-                                    <td class="px-4 py-3 border-r border-gray-400 text-gray-800">{{ emp.status }}</td>
-                                    <td class="px-4 py-3 text-gray-800">{{ emp.progress }}</td>
+                                <tr v-if="employees.data.length === 0">
+                                    <td colspan="5" class="px-4 py-6 text-gray-500 italic text-center">Phòng ban này chưa có nhân viên nào phù hợp.</td>
                                 </tr>
-                                <tr v-for="i in 3" :key="'empty-'+i">
+                                
+                                <tr v-for="emp in employees.data" :key="emp.id" class="hover:bg-gray-50 transition cursor-pointer" @click="openModal(emp)">
+                                    <td class="px-4 py-3 border-r border-gray-400 text-gray-800">NV-{{ String(emp.id).padStart(3, '0') }}</td>
+                                    <td class="px-4 py-3 border-r border-gray-400 text-gray-800 text-left font-medium">{{ emp.name }}</td>
+                                    <td class="px-4 py-3 border-r border-gray-400 text-gray-800">Nhân viên</td>
+                                    <td class="px-4 py-3 border-r border-gray-400 text-gray-800">Đang đánh giá</td>
+                                    <td class="px-4 py-3 text-gray-800">-</td>
+                                </tr>
+                                
+                                <tr v-for="i in Math.max(0, 3 - employees.data.length)" :key="'empty-'+i">
                                     <td class="px-4 py-5 border-r border-gray-400"></td>
                                     <td class="px-4 py-5 border-r border-gray-400"></td>
                                     <td class="px-4 py-5 border-r border-gray-400"></td>
@@ -112,12 +121,17 @@ const closeModal = () => {
                         </table>
                     </div>
 
-                    <div class="mt-8 flex justify-center items-center gap-2 text-sm text-[#0ea5e9] font-bold">
-                        <button class="hover:underline">&lt; Prev</button>
-                        <button class="w-7 h-7 rounded bg-blue-100 flex items-center justify-center">1</button>
-                        <button class="w-7 h-7 rounded hover:bg-gray-100 flex items-center justify-center font-normal">2</button>
-                        <button class="w-7 h-7 rounded hover:bg-gray-100 flex items-center justify-center font-normal">3</button>
-                        <button class="hover:underline">Next &gt;</button>
+                    <div class="mt-8 flex justify-center items-center gap-2 text-sm text-[#0ea5e9] font-bold" v-if="employees.links.length > 3">
+                        <Component v-for="link in employees.links" :key="link.label"
+                                   :is="link.url ? 'a' : 'span'" 
+                                   :href="link.url" 
+                                   v-html="link.label" 
+                                   class="px-3 py-1 border border-gray-300 rounded text-sm transition" 
+                                   :class="{
+                                       'bg-[#0ea5e9] text-white font-bold': link.active, 
+                                       'text-gray-400 cursor-not-allowed font-normal': !link.url,
+                                       'hover:bg-gray-100 font-normal': link.url && !link.active
+                                   }" />
                     </div>
 
                 </div>
@@ -150,7 +164,7 @@ const closeModal = () => {
                         </div>
                     </template>
                     <template v-else>
-                        <p class="text-gray-500 italic">- Không có -</p>
+                        <p class="text-gray-500 italic">- Đang cập nhật -</p>
                     </template>
                 </div>
 

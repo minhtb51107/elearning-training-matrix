@@ -1,13 +1,19 @@
 <?php
 
 use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\DepartmentAdmin\TrainingRequestController;
-use App\Http\Controllers\SystemAdmin\CourseController;
-use App\Http\Controllers\SystemAdmin\CourseClassController;
+use App\Http\Controllers\DepartmentAdmin\TrainingRequestController as DeptTrainingRequestController;
+use App\Http\Controllers\DepartmentAdmin\CourseController as DeptCourseController;
+use App\Http\Controllers\DepartmentAdmin\EmployeeController as DeptEmployeeController;
+use App\Http\Controllers\SystemAdmin\CourseController as SysCourseController;
+use App\Http\Controllers\SystemAdmin\CourseClassController as SysCourseClassController;
+use App\Http\Controllers\SystemAdmin\TrainingRequestController as SysTrainingRequestController;
+use App\Http\Controllers\SystemAdmin\EmployeeController as SysEmployeeController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-Route::get('/', function () { return redirect()->route('login'); });
+Route::get('/', function () {
+    return redirect()->route('login');
+});
 
 Route::get('/dashboard', function () {
     return Inertia::render('Dashboard');
@@ -22,50 +28,48 @@ Route::middleware('auth')->group(function () {
     // CỤM ROUTE DÀNH CHO ADMIN PHÒNG BAN (ROLE 2)
     // ==============================================================
     Route::prefix('department')->name('department.')->group(function () {
-        Route::get('/requests', [TrainingRequestController::class, 'index'])->name('requests.index');
-        Route::get('/requests/create', [TrainingRequestController::class, 'create'])->name('requests.create');
-        Route::post('/requests', [TrainingRequestController::class, 'store'])->name('requests.store');
-        Route::put('/requests/{trainingRequest}', [TrainingRequestController::class, 'update'])->name('requests.update');
-        Route::get('/requests/{trainingRequest}', [TrainingRequestController::class, 'show'])->name('requests.show');
+        Route::get('/requests', [DeptTrainingRequestController::class, 'index'])->name('requests.index');
+        Route::get('/requests/create', [DeptTrainingRequestController::class, 'create'])->name('requests.create');
+        Route::post('/requests', [DeptTrainingRequestController::class, 'store'])->name('requests.store');
+        Route::put('/requests/{trainingRequest}', [DeptTrainingRequestController::class, 'update'])->name('requests.update');
+        Route::get('/requests/{trainingRequest}', [DeptTrainingRequestController::class, 'show'])->name('requests.show');
         
-        Route::get('/courses', function () { return Inertia::render('DepartmentAdmin/Courses/Index'); })->name('courses.index');
+        // Đã cập nhật Route thật cho Courses và Employees
+        Route::get('/courses', [DeptCourseController::class, 'index'])->name('courses.index');
         Route::get('/courses/{id}', function () { return Inertia::render('DepartmentAdmin/Courses/Show'); })->name('courses.show');
-        Route::get('/employees', function () { return Inertia::render('DepartmentAdmin/Employees/Index'); })->name('employees.index');
+        Route::get('/employees', [DeptEmployeeController::class, 'index'])->name('employees.index');
     });
 
     // ==============================================================
     // CỤM ROUTE DÀNH CHO ADMIN HỆ THỐNG (ROLE 1)
     // ==============================================================
     Route::prefix('system')->name('system.')->group(function () {
-        Route::get('/requests', [\App\Http\Controllers\SystemAdmin\TrainingRequestController::class, 'index'])->name('requests.index');
-        Route::get('/requests/{trainingRequest}', [\App\Http\Controllers\SystemAdmin\TrainingRequestController::class, 'show'])->name('requests.show');
-        Route::put('/requests/{trainingRequest}/status', [\App\Http\Controllers\SystemAdmin\TrainingRequestController::class, 'updateStatus'])->name('requests.update-status');
+        Route::get('/requests', [SysTrainingRequestController::class, 'index'])->name('requests.index');
+        Route::get('/requests/{trainingRequest}', [SysTrainingRequestController::class, 'show'])->name('requests.show');
+        Route::put('/requests/{trainingRequest}/status', [SysTrainingRequestController::class, 'updateStatus'])->name('requests.update-status');
         
-        Route::get('/courses', [CourseController::class, 'index'])->name('courses.index');
-        Route::get('/courses/create', [CourseController::class, 'create'])->name('courses.create');
-        Route::post('/courses', [CourseController::class, 'store'])->name('courses.store');
-        Route::get('/courses/{course}', [CourseController::class, 'show'])->name('courses.show');
+        Route::get('/courses', [SysCourseController::class, 'index'])->name('courses.index');
+        Route::get('/courses/create', [SysCourseController::class, 'create'])->name('courses.create');
+        Route::post('/courses', [SysCourseController::class, 'store'])->name('courses.store');
+        Route::get('/courses/{course}', [SysCourseController::class, 'show'])->name('courses.show');
         Route::get('/courses/{id}/statistics', function () { return Inertia::render('SystemAdmin/Courses/Statistics'); })->name('courses.statistics');
         
-        // CỤM ROUTE LỚP HỌC 
-        Route::get('/classes', [CourseClassController::class, 'index'])->name('classes.index');
-        Route::get('/classes/create', [CourseClassController::class, 'create'])->name('classes.create');
-        Route::post('/classes', [CourseClassController::class, 'store'])->name('classes.store');
-        Route::get('/classes/{courseClass}', [CourseClassController::class, 'show'])->name('classes.show');
-        Route::put('/classes/{courseClass}/status', [CourseClassController::class, 'updateStatus'])->name('classes.update-status');
-        
-        // Quản lý học viên
-        Route::post('/classes/{courseClass}/students', [CourseClassController::class, 'addStudents'])->name('classes.add-students');
-        Route::delete('/classes/{courseClass}/students/{studentId}', [CourseClassController::class, 'removeStudent'])->name('classes.remove-student');
-        
-        // 👇 Quản lý tài liệu 👇
-        Route::post('/classes/{courseClass}/documents', [CourseClassController::class, 'uploadDocument'])->name('classes.upload-document');
-        Route::delete('/classes/documents/{document}', [CourseClassController::class, 'deleteDocument'])->name('classes.delete-document');
+        Route::get('/classes', [SysCourseClassController::class, 'index'])->name('classes.index');
+        Route::get('/classes/create', [SysCourseClassController::class, 'create'])->name('classes.create');
+        Route::post('/classes', [SysCourseClassController::class, 'store'])->name('classes.store');
+        Route::get('/classes/{courseClass}', [SysCourseClassController::class, 'show'])->name('classes.show');
+        Route::put('/classes/{courseClass}/status', [SysCourseClassController::class, 'updateStatus'])->name('classes.update-status');
+        Route::post('/classes/{courseClass}/students', [SysCourseClassController::class, 'addStudents'])->name('classes.add-students');
+        Route::delete('/classes/{courseClass}/students/{studentId}', [SysCourseClassController::class, 'removeStudent'])->name('classes.remove-student');
+        Route::post('/classes/{courseClass}/documents', [SysCourseClassController::class, 'uploadDocument'])->name('classes.upload-document');
+        Route::delete('/classes/documents/{document}', [SysCourseClassController::class, 'deleteDocument'])->name('classes.delete-document');
         
         Route::get('/grades', function () { return Inertia::render('SystemAdmin/Grades/Index'); })->name('grades.index');
         Route::get('/grades/{id}', function () { return Inertia::render('SystemAdmin/Grades/Show'); })->name('grades.show');
         Route::get('/reports', function () { return Inertia::render('SystemAdmin/Reports/Index'); })->name('reports.index');
-        Route::get('/employees', function () { return Inertia::render('SystemAdmin/Employees/Index'); })->name('employees.index');
+        
+        // 👇 Đã cập nhật Route thật cho Employee System Admin 👇
+        Route::get('/employees', [SysEmployeeController::class, 'index'])->name('employees.index');
     });
 
     // ==============================================================
@@ -79,10 +83,6 @@ Route::middleware('auth')->group(function () {
         Route::get('/results', function () { return Inertia::render('Employee/Results/Index'); })->name('results');
         Route::get('/account', function () { return Inertia::render('Employee/Account/Index'); })->name('account');
     });
-
-    Route::get('/test-doc', function () {
-    return \App\Models\Document::all();
-});
 });
 
 require __DIR__.'/auth.php';
