@@ -33,10 +33,11 @@ class CourseClass extends Model
     }
 
     public function enrollments() {
-        return $this->hasMany(ClassEnrollment::class, 'class_id');
+        // Chỉ định rõ khóa ngoại là course_class_id thay vì class_id
+        return $this->hasMany(ClassEnrollment::class, 'course_class_id'); 
     }
 
     public function sessions() {
-        return $this->hasMany(ClassSession::class, 'class_id');
+        return $this->hasMany(ClassSession::class, 'course_class_id');
     }
 }

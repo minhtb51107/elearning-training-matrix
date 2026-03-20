@@ -39,29 +39,29 @@ Route::middleware('auth')->group(function () {
     // CỤM ROUTE DÀNH CHO ADMIN HỆ THỐNG (ROLE 1)
     // ==============================================================
     Route::prefix('system')->name('system.')->group(function () {
-        // QUẢN LÝ YÊU CẦU
         Route::get('/requests', [\App\Http\Controllers\SystemAdmin\TrainingRequestController::class, 'index'])->name('requests.index');
         Route::get('/requests/{trainingRequest}', [\App\Http\Controllers\SystemAdmin\TrainingRequestController::class, 'show'])->name('requests.show');
         Route::put('/requests/{trainingRequest}/status', [\App\Http\Controllers\SystemAdmin\TrainingRequestController::class, 'updateStatus'])->name('requests.update-status');
         
-        // QUẢN LÝ KHÓA HỌC
         Route::get('/courses', [CourseController::class, 'index'])->name('courses.index');
         Route::get('/courses/create', [CourseController::class, 'create'])->name('courses.create');
         Route::post('/courses', [CourseController::class, 'store'])->name('courses.store');
         Route::get('/courses/{course}', [CourseController::class, 'show'])->name('courses.show');
         Route::get('/courses/{id}/statistics', function () { return Inertia::render('SystemAdmin/Courses/Statistics'); })->name('courses.statistics');
         
-        // 👇 QUẢN LÝ LỚP HỌC (ĐÃ CHUYỂN SANG CONTROLLER) 👇
+        // 👇 CỤM ROUTE LỚP HỌC (ĐÃ THÊM ROUTE HỌC VIÊN) 👇
         Route::get('/classes', [CourseClassController::class, 'index'])->name('classes.index');
         Route::get('/classes/create', [CourseClassController::class, 'create'])->name('classes.create');
         Route::post('/classes', [CourseClassController::class, 'store'])->name('classes.store');
         Route::get('/classes/{courseClass}', [CourseClassController::class, 'show'])->name('classes.show');
+        Route::put('/classes/{courseClass}/status', [CourseClassController::class, 'updateStatus'])->name('classes.update-status');
+        Route::post('/classes/{courseClass}/students', [CourseClassController::class, 'addStudents'])->name('classes.add-students');
+        Route::delete('/classes/{courseClass}/students/{studentId}', [CourseClassController::class, 'removeStudent'])->name('classes.remove-student');
         
         Route::get('/grades', function () { return Inertia::render('SystemAdmin/Grades/Index'); })->name('grades.index');
         Route::get('/grades/{id}', function () { return Inertia::render('SystemAdmin/Grades/Show'); })->name('grades.show');
         Route::get('/reports', function () { return Inertia::render('SystemAdmin/Reports/Index'); })->name('reports.index');
         Route::get('/employees', function () { return Inertia::render('SystemAdmin/Employees/Index'); })->name('employees.index');
-        Route::put('/classes/{courseClass}/status', [\App\Http\Controllers\SystemAdmin\CourseClassController::class, 'updateStatus'])->name('classes.update-status');
     });
 
     // ==============================================================
@@ -75,10 +75,6 @@ Route::middleware('auth')->group(function () {
         Route::get('/results', function () { return Inertia::render('Employee/Results/Index'); })->name('results');
         Route::get('/account', function () { return Inertia::render('Employee/Account/Index'); })->name('account');
     });
-
-    Route::get('/test-db', function () {
-    return \App\Models\CourseClass::all();
-});
 });
 
 require __DIR__.'/auth.php';
