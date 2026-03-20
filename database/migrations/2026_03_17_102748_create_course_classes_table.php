@@ -10,18 +10,25 @@ return new class extends Migration
     {
         Schema::create('course_classes', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('course_id')->constrained('courses')->cascadeOnDelete();
+            $table->foreignId('course_id')->constrained()->cascadeOnDelete();
             $table->string('code')->unique();
-            $table->string('name'); 
-            
-            // CẬP NHẬT: Trỏ về bảng instructors (sẽ tạo ở phần 2)
+            $table->string('name');
             $table->foreignId('instructor_id')->nullable()->constrained('instructors')->nullOnDelete();
             
-            $table->integer('capacity'); 
+            // Các cột bổ sung theo chuẩn BA Specification
             $table->date('start_date');
             $table->date('end_date');
-            $table->enum('status', ['draft', 'open', 'in_progress', 'completed'])->default('draft');
+            $table->integer('max_students');
+            $table->enum('format', ['Online', 'Offline', 'Hybrid'])->default('Offline');
+            
+            // Phạm vi áp dụng (null = Toàn công ty)
+            $table->foreignId('department_id')->nullable()->constrained('departments')->nullOnDelete();
+            
+            // Trạng thái: Nháp, Mở đăng ký, Đang học, Kết thúc
+            $table->string('status')->default('Nháp');
+            
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 

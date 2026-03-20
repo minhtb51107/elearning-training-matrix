@@ -1,39 +1,57 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import Modal from '@/Components/Modal.vue';
+
+// 1. NHẬN DỮ LIỆU THẬT TỪ CONTROLLER
+const props = defineProps({
+    courseClass: Object,
+});
 
 // Tab State
 const activeTab = ref('Thông tin');
 
-// DỮ LIỆU MOCK THEO THIẾT KẾ
-const cls = ref({
-    code: 'CLS-2026-SA-01',
-    name: 'SALES NÂNG CAO - LỚP L1',
-    time: '20/01/2026 - 22/01/2026',
-    status: 'MỞ ĐĂNG KÝ', // MỞ ĐĂNG KÝ | ĐANG HỌC | KẾT THÚC
-    instructor: 'Nguyễn Văn Nam',
-    students_count: '30 / 35',
-    shift: 'Sáng',
-    scope: 'Phòng Kinh doanh',
-    max_students: 35,
-    note: ''
-});
-
-// Hàm đổi trạng thái mô phỏng
-const changeStatus = (newStatus) => {
-    cls.value.status = newStatus;
+// 2. FORMAT HIỂN THỊ THỜI GIAN
+const formatTimeRange = (start, end) => {
+    if (!start || !end) return '--';
+    const startDate = new Date(start).toLocaleDateString('vi-VN');
+    const endDate = new Date(end).toLocaleDateString('vi-VN');
+    return `${startDate} - ${endDate}`;
 };
 
-// Dữ liệu Tab Học viên
+// 3. MAP DỮ LIỆU TỪ PROPS VÀO BIẾN GIAO DIỆN
+const cls = computed(() => ({
+    id: props.courseClass.id,
+    code: props.courseClass.code,
+    name: props.courseClass.name,
+    time: formatTimeRange(props.courseClass.start_date, props.courseClass.end_date),
+    status: props.courseClass.status.toUpperCase(), // Viết hoa để so sánh với Mockup
+    instructor: props.courseClass.instructor?.name || 'Chưa phân công',
+    students_count: `0 / ${props.courseClass.max_students}`, // Đang giả lập số 0 vì chưa có học viên
+    shift: 'Sáng', // Thuộc tính này bạn có thể bổ sung vào DB sau nếu cần
+    scope: props.courseClass.department?.name || 'Toàn công ty',
+    max_students: props.courseClass.max_students,
+    note: ''
+}));
+
+// 4. HÀM CẬP NHẬT TRẠNG THÁI LỚP HỌC (GỌI XUỐNG DATABASE)
+const changeStatus = (newStatus) => {
+    if (confirm(`Bạn có chắc chắn muốn chuyển trạng thái lớp học thành: ${newStatus}?`)) {
+        router.put(route('system.classes.update-status', cls.value.id), {
+            status: newStatus
+        }, { preserveScroll: true });
+    }
+};
+
+// Dữ liệu Tab Học viên (GIỮ NGUYÊN MOCK DATA ĐỂ VIEW)
 const students = ref([
     { id: 1, name: 'Nguyễn A', employee_code: 'NV-2023-015', department: 'Kinh doanh', email: 'a@company.com', status: 'Đã đăng kí', score: '-', result: '-', remark: '-', action: 'Gỡ' },
     { id: 2, name: 'Trần B', employee_code: 'NV-2023-016', department: 'Kinh doanh', email: 'b@company.com', status: 'Hoàn thành', score: '85', result: 'Đạt', remark: 'Tốt', action: 'Xem' },
     { id: 3, name: 'Lê C', employee_code: 'NV-2023-017', department: 'Kinh doanh', email: 'c@company.com', status: 'Chưa đạt', score: '60', result: 'Chưa đạt', remark: 'Cần cải thiện', action: 'Chấm' },
 ]);
 
-// Dữ liệu Tab Tài liệu
+// Dữ liệu Tab Tài liệu (GIỮ NGUYÊN MOCK DATA ĐỂ VIEW)
 const documents = ref([
     { id: 1, name: 'Slide_BanHang.pdf', type: 'PDF', date: '10/01' },
     { id: 2, name: 'Video kỹ năng chốt sale', type: 'LINK', date: '11/01' }
@@ -59,6 +77,11 @@ const closeStudentModal = () => {
     <AuthenticatedLayout>
         <div class="py-6">
             <div class="max-w-5xl mx-auto sm:px-6 lg:px-8">
+                
+                <div v-if="$page.props.flash?.success" class="mb-4 bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded shadow-sm">
+                    {{ $page.props.flash.success }}
+                </div>
+
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-8 border border-gray-200">
                     
                     <div class="mb-4">
@@ -77,7 +100,8 @@ const closeStudentModal = () => {
                                   :class="{
                                       'text-[#16a34a]': cls.status === 'MỞ ĐĂNG KÝ', 
                                       'text-[#d97706]': cls.status === 'ĐANG HỌC', 
-                                      'text-[#dc2626]': cls.status === 'KẾT THÚC'
+                                      'text-[#dc2626]': cls.status === 'KẾT THÚC',
+                                      'text-gray-500': cls.status === 'NHÁP'
                                   }">
                                 {{ cls.status }}
                             </span>
@@ -89,14 +113,17 @@ const closeStudentModal = () => {
                                 <p class="mt-2"><span class="font-bold text-gray-800">Số lượng:</span> {{ cls.students_count }}</p>
                             </div>
                             
-                            <button v-if="cls.status === 'MỞ ĐĂNG KÝ'" @click="changeStatus('ĐANG HỌC')" class="text-[#16a34a] hover:text-green-700 font-bold uppercase transition">
+                            <button v-if="cls.status === 'MỞ ĐĂNG KÝ'" @click="changeStatus('Đang học')" class="text-[#16a34a] hover:text-green-700 font-bold uppercase transition">
                                 [ BẮT ĐẦU HỌC ]
                             </button>
-                            <button v-if="cls.status === 'ĐANG HỌC'" @click="changeStatus('KẾT THÚC')" class="text-[#c93b42] hover:text-red-800 font-bold uppercase transition">
+                            <button v-if="cls.status === 'ĐANG HỌC'" @click="changeStatus('Kết thúc')" class="text-[#c93b42] hover:text-red-800 font-bold uppercase transition">
                                 [ Kết thúc ]
                             </button>
-                            <button v-if="cls.status === 'KẾT THÚC'" @click="changeStatus('MỞ ĐĂNG KÝ')" class="text-[#16a34a] hover:text-green-700 font-bold uppercase transition">
+                            <button v-if="cls.status === 'KẾT THÚC'" @click="changeStatus('Mở đăng ký')" class="text-[#16a34a] hover:text-green-700 font-bold uppercase transition">
                                 [ Mở lại khóa học ]
+                            </button>
+                            <button v-if="cls.status === 'NHÁP'" @click="changeStatus('Mở đăng ký')" class="text-blue-600 hover:text-blue-800 font-bold uppercase transition">
+                                [ XUẤT BẢN / MỞ ĐĂNG KÝ ]
                             </button>
                         </div>
                     </div>
@@ -122,14 +149,14 @@ const closeStudentModal = () => {
                                 
                                 <div class="mt-4">
                                     <p class="font-bold mb-1">Ghi chú:</p>
-                                    <textarea rows="4" class="w-full bg-white border-gray-300 rounded shadow-sm text-sm resize-none"></textarea>
+                                    <textarea rows="4" disabled class="w-full bg-white border-gray-300 rounded shadow-sm text-sm resize-none"></textarea>
                                 </div>
                             </div>
                             <div>
                                 <p class="mb-4 font-bold">Giảng viên: <span class="font-normal ml-2">{{ cls.instructor }}</span></p>
                                 <p class="font-bold mb-2">Thời gian học:</p>
-                                <p class="mb-2">- Từ ngày: <span class="font-normal ml-2 bg-white px-3 py-1 border border-gray-300 rounded shadow-sm inline-block min-w-[150px]">[ 20/01/2026 ]</span></p>
-                                <p class="mb-2">- Đến ngày: <span class="font-normal ml-2 bg-white px-3 py-1 border border-gray-300 rounded shadow-sm inline-block min-w-[150px]">[ 22/01/2026 ]</span></p>
+                                <p class="mb-2">- Từ ngày: <span class="font-normal ml-2 bg-white px-3 py-1 border border-gray-300 rounded shadow-sm inline-block min-w-[150px]">[ {{ new Date(courseClass.start_date).toLocaleDateString('vi-VN') }} ]</span></p>
+                                <p class="mb-2">- Đến ngày: <span class="font-normal ml-2 bg-white px-3 py-1 border border-gray-300 rounded shadow-sm inline-block min-w-[150px]">[ {{ new Date(courseClass.end_date).toLocaleDateString('vi-VN') }} ]</span></p>
                             </div>
                         </div>
                     </div>
@@ -241,14 +268,6 @@ const closeStudentModal = () => {
                         </div>
                     </div>
 
-                    <div v-if="activeTab !== 'Thông tin'" class="mt-6 flex justify-center items-center gap-4 text-sm text-[#0ea5e9] font-medium">
-                        <button class="hover:underline">&lt; Prev</button>
-                        <button class="w-7 h-7 rounded bg-blue-100 font-bold flex items-center justify-center">1</button>
-                        <button class="w-7 h-7 rounded hover:bg-gray-100 flex items-center justify-center text-gray-600">2</button>
-                        <button class="w-7 h-7 rounded hover:bg-gray-100 flex items-center justify-center text-gray-600">3</button>
-                        <button class="hover:underline">Next &gt;</button>
-                    </div>
-
                 </div>
             </div>
         </div>
@@ -269,7 +288,6 @@ const closeStudentModal = () => {
                     <p><span class="font-bold">Tên lớp:</span> {{ cls.name }}</p>
                     <p><span class="font-bold">Trạng thái:</span> [ {{ selectedStudent.status }} ]</p>
                     <p v-if="selectedStudent.score !== '-'"><span class="font-bold">Điểm:</span> <span class="font-bold text-[#16a34a]">{{ selectedStudent.score }} - {{ selectedStudent.result }}</span></p>
-                    <p v-if="selectedStudent.score !== '-'"><span class="font-bold">Ngày hoàn thành:</span> 22/01/2026</p>
                 </div>
 
                 <div class="flex justify-center border-t border-gray-200 pt-4 mt-4">
