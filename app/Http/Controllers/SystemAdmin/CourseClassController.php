@@ -11,6 +11,8 @@ use App\Models\User;
 use App\Models\ClassEnrollment;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use App\Models\Document;
+use Illuminate\Support\Facades\Storage;
 
 class CourseClassController extends Controller
 {
@@ -104,13 +106,14 @@ class CourseClassController extends Controller
         return redirect()->route('system.classes.index')->with('success', $message);
     }
 
-    public function show($id)
+public function show($id)
     {
         $courseClass = CourseClass::with([
             'course', 
             'instructor', 
             'department',
-            'enrollments.user.department' 
+            'enrollments.user.department',
+            'documents' 
         ])->findOrFail($id);
 
         $enrolledUserIds = $courseClass->enrollments->pluck('user_id')->toArray();
@@ -162,5 +165,55 @@ class CourseClassController extends Controller
             ->delete();
 
         return redirect()->back()->with('success', 'Đã gỡ học viên khỏi lớp!');
+    }
+
+// =========================================
+    // QUẢN LÝ TÀI LIỆU (ĐÃ CHUYỂN SANG S3 - SUPABASE)
+    // =========================================
+    public function uploadDocument(Request $request, CourseClass $courseClass)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'type' => 'required|in:pdf,link,pptx,doc,video',
+            'file' => 'nullable|file|max:20480', // Max 20MB
+            'url' => 'nullable|string'
+        ]);
+
+        $url = $validated['url'] ?? '';
+
+        // Xử lý upload file vật lý thẳng lên Supabase (S3)
+        if ($request->hasFile('file')) {
+            // Thay 'public' bằng 's3'
+            $path = $request->file('file')->store('documents', 's3');
+            
+            // Lấy đường dẫn public từ S3 để lưu vào Database
+            $url = Storage::disk('s3')->url($path);
+        }
+
+        Document::create([
+            'course_id' => $courseClass->course_id,
+            'course_class_id' => $courseClass->id,
+            'name' => $validated['name'],
+            'type' => $validated['type'],
+            'url' => $url,
+        ]);
+
+        return redirect()->back()->with('success', 'Đã tải tài liệu lên Đám mây Supabase thành công!');
+    }
+
+    public function deleteDocument(Document $document)
+    {
+        // Kiểm tra nếu là file tải lên Supabase (trong link có chữ supabase)
+        if ($document->type !== 'link' && str_contains($document->url, 'supabase')) {
+            // Lấy tên file từ URL (ví dụ: my-file.pdf) và ghép với thư mục documents/
+            $path = 'documents/' . basename($document->url);
+            
+            // Xóa file trên Supabase
+            Storage::disk('s3')->delete($path);
+        }
+
+        $document->delete();
+
+        return redirect()->back()->with('success', 'Đã xóa tài liệu!');
     }
 }

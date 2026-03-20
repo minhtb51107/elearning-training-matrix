@@ -7,9 +7,7 @@ use App\Http\Controllers\SystemAdmin\CourseClassController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-Route::get('/', function () {
-    return redirect()->route('login');
-});
+Route::get('/', function () { return redirect()->route('login'); });
 
 Route::get('/dashboard', function () {
     return Inertia::render('Dashboard');
@@ -49,14 +47,20 @@ Route::middleware('auth')->group(function () {
         Route::get('/courses/{course}', [CourseController::class, 'show'])->name('courses.show');
         Route::get('/courses/{id}/statistics', function () { return Inertia::render('SystemAdmin/Courses/Statistics'); })->name('courses.statistics');
         
-        // 👇 CỤM ROUTE LỚP HỌC (ĐÃ THÊM ROUTE HỌC VIÊN) 👇
+        // CỤM ROUTE LỚP HỌC 
         Route::get('/classes', [CourseClassController::class, 'index'])->name('classes.index');
         Route::get('/classes/create', [CourseClassController::class, 'create'])->name('classes.create');
         Route::post('/classes', [CourseClassController::class, 'store'])->name('classes.store');
         Route::get('/classes/{courseClass}', [CourseClassController::class, 'show'])->name('classes.show');
         Route::put('/classes/{courseClass}/status', [CourseClassController::class, 'updateStatus'])->name('classes.update-status');
+        
+        // Quản lý học viên
         Route::post('/classes/{courseClass}/students', [CourseClassController::class, 'addStudents'])->name('classes.add-students');
         Route::delete('/classes/{courseClass}/students/{studentId}', [CourseClassController::class, 'removeStudent'])->name('classes.remove-student');
+        
+        // 👇 Quản lý tài liệu 👇
+        Route::post('/classes/{courseClass}/documents', [CourseClassController::class, 'uploadDocument'])->name('classes.upload-document');
+        Route::delete('/classes/documents/{document}', [CourseClassController::class, 'deleteDocument'])->name('classes.delete-document');
         
         Route::get('/grades', function () { return Inertia::render('SystemAdmin/Grades/Index'); })->name('grades.index');
         Route::get('/grades/{id}', function () { return Inertia::render('SystemAdmin/Grades/Show'); })->name('grades.show');
@@ -75,6 +79,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/results', function () { return Inertia::render('Employee/Results/Index'); })->name('results');
         Route::get('/account', function () { return Inertia::render('Employee/Account/Index'); })->name('account');
     });
+
+    Route::get('/test-doc', function () {
+    return \App\Models\Document::all();
+});
 });
 
 require __DIR__.'/auth.php';

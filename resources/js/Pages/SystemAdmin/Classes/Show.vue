@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import Modal from '@/Components/Modal.vue';
 
 const props = defineProps({
@@ -25,7 +25,7 @@ const cls = computed(() => ({
     time: formatTimeRange(props.courseClass.start_date, props.courseClass.end_date),
     status: props.courseClass.status.toUpperCase(),
     instructor: props.courseClass.instructor?.name || 'Chưa phân công',
-    students_count: `${props.courseClass.enrollments.length} / ${props.courseClass.max_students}`,
+    students_count: `${props.courseClass.enrollments?.length || 0} / ${props.courseClass.max_students}`,
     shift: 'Sáng',
     scope: props.courseClass.department?.name || 'Toàn công ty',
     max_students: props.courseClass.max_students,
@@ -38,7 +38,6 @@ const changeStatus = (newStatus) => {
     }
 };
 
-// DỮ LIỆU HỌC VIÊN THẬT (Đã dịch sang tiếng Việt)
 const students = computed(() => {
     const statusMap = {
         'enrolled': 'Đã đăng ký',
@@ -47,14 +46,14 @@ const students = computed(() => {
         'failed': 'Chưa đạt'
     };
 
-    return props.courseClass.enrollments.map(enrol => ({
+    return (props.courseClass.enrollments || []).map(enrol => ({
         id: enrol.user.id,
         name: enrol.user.name,
         employee_code: `NV-${String(enrol.user.id).padStart(3, '0')}`,
         department: enrol.user.department?.name || '--',
         email: enrol.user.email,
         status: statusMap[enrol.status] || enrol.status, 
-        score: enrol.final_score || '-', // Lấy field từ database
+        score: enrol.final_score || '-',
         result: enrol.status === 'completed' ? 'Đạt' : (enrol.status === 'failed' ? 'Chưa đạt' : '-'),
         remark: '-'
     }));
@@ -85,10 +84,53 @@ const removeStudent = (studentId, studentName) => {
     }
 };
 
-const documents = ref([
-    { id: 1, name: 'Slide_BanHang.pdf', type: 'PDF', date: '10/01' },
-    { id: 2, name: 'Video kỹ năng chốt sale', type: 'LINK', date: '11/01' }
-]);
+// ==========================================
+// LOGIC QUẢN LÝ TÀI LIỆU
+// ==========================================
+const documents = computed(() => {
+    return (props.courseClass.documents || []).map(doc => ({
+        id: doc.id,
+        name: doc.name,
+        type: doc.type.toUpperCase(),
+        date: new Date(doc.created_at).toLocaleDateString('vi-VN'),
+        url: doc.url
+    }));
+});
+
+const showAddDocModal = ref(false);
+const docForm = useForm({
+    name: '',
+    type: 'pdf',
+    file: null,
+    url: ''
+});
+
+const submitAddDoc = () => {
+    // Nếu upload file vật lý
+    if (docForm.type !== 'link' && !docForm.file) {
+        alert('Vui lòng chọn một file để tải lên!');
+        return;
+    }
+    // Nếu up link
+    if (docForm.type === 'link' && !docForm.url) {
+        alert('Vui lòng nhập đường dẫn URL!');
+        return;
+    }
+
+    docForm.post(route('system.classes.upload-document', props.courseClass.id), {
+        onSuccess: () => {
+            showAddDocModal.value = false;
+            docForm.reset();
+        },
+        preserveScroll: true
+    });
+};
+
+const deleteDoc = (doc) => {
+    if (confirm(`Bạn có chắc chắn muốn xóa tài liệu [ ${doc.name} ]?`)) {
+        router.delete(route('system.classes.delete-document', doc.id), { preserveScroll: true });
+    }
+};
 </script>
 
 <template>
@@ -216,24 +258,40 @@ const documents = ref([
                     </div>
 
                     <div v-if="activeTab === 'Tài liệu'">
-                        <h3 class="text-base font-bold text-gray-800 mb-4 border-b border-gray-300 pb-2">Tài liệu lớp học</h3>
-                        <div class="mb-4"><button class="text-[#d97706] font-bold text-[15px] hover:underline transition">[ + TẢI LÊN TÀI LIỆU ]</button></div>
-                        <div class="overflow-x-auto border border-gray-300 w-3/4">
+                        <h3 class="text-base font-bold text-gray-800 mb-4 border-b border-gray-300 pb-2">Tài liệu lớp học ({{ documents.length }})</h3>
+                        <div class="mb-4">
+                            <button @click="showAddDocModal = true" class="text-[#d97706] font-bold text-[15px] hover:underline transition">
+                                [ + TẢI LÊN TÀI LIỆU ]
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto border border-gray-300 w-full md:w-3/4">
                             <table class="min-w-full divide-y divide-gray-300 text-center text-[14px]">
                                 <thead class="bg-[#fcd38e]">
                                     <tr>
                                         <th class="px-4 py-3 font-bold text-gray-900 border-r border-gray-300">Tên tài liệu</th>
                                         <th class="px-4 py-3 font-bold text-gray-900 border-r border-gray-300">Loại</th>
-                                        <th class="px-4 py-3 font-bold text-gray-900 border-r border-gray-300">Ngày</th>
+                                        <th class="px-4 py-3 font-bold text-gray-900 border-r border-gray-300">Ngày tải lên</th>
                                         <th class="px-4 py-3 font-bold text-gray-900">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody class="bg-white divide-y divide-gray-300">
+                                    <tr v-if="documents.length === 0">
+                                        <td colspan="4" class="px-4 py-6 text-gray-500 italic">Lớp học này chưa có tài liệu nào.</td>
+                                    </tr>
                                     <tr v-for="doc in documents" :key="doc.id" class="hover:bg-gray-50 transition">
-                                        <td class="px-4 py-3 border-r border-gray-300 text-gray-800">{{ doc.name }}</td>
+                                        <td class="px-4 py-3 border-r border-gray-300 text-blue-600 font-bold text-left">
+                                           <a :href="doc.url" 
+   target="_blank" 
+   :download="doc.type !== 'LINK' ? doc.name : false" 
+   class="text-[#0ea5e9] hover:text-blue-800 hover:underline font-bold transition">
+    {{ doc.name }}
+</a>
+                                        </td>
                                         <td class="px-4 py-3 border-r border-gray-300 text-gray-700">{{ doc.type }}</td>
                                         <td class="px-4 py-3 border-r border-gray-300 text-gray-700">{{ doc.date }}</td>
-                                        <td class="px-4 py-3"><button class="text-[#0ea5e9] hover:underline font-medium">[ Xóa ]</button></td>
+                                        <td class="px-4 py-3">
+                                            <button @click="deleteDoc(doc)" class="text-[#c93b42] hover:underline font-medium">[ Xóa ]</button>
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -252,7 +310,6 @@ const documents = ref([
         <Modal :show="showAddStudentModal" @close="showAddStudentModal = false" maxWidth="2xl">
             <div class="p-6 bg-white">
                 <h3 class="text-lg font-bold text-gray-800 mb-4 border-b border-gray-200 pb-2">Thêm học viên vào lớp</h3>
-                
                 <div class="max-h-[400px] overflow-y-auto mb-4 border border-gray-300 rounded">
                     <table class="min-w-full text-sm text-left">
                         <thead class="bg-gray-100 sticky top-0">
@@ -278,16 +335,56 @@ const documents = ref([
                         </tbody>
                     </table>
                 </div>
-
-                <div class="flex justify-end gap-3 pt-4">
-                    <button @click="showAddStudentModal = false" class="px-4 py-2 text-gray-600 font-bold border border-gray-300 rounded hover:bg-gray-100">
-                        Hủy
-                    </button>
-                    <button @click="submitAddStudents" class="px-4 py-2 bg-[#16a34a] text-white font-bold rounded hover:bg-green-700 shadow">
-                        Xác nhận thêm ({{ selectedUserIds.length }})
-                    </button>
+                <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                    <button @click="showAddStudentModal = false" class="px-4 py-2 text-gray-600 font-bold border border-gray-300 rounded hover:bg-gray-100">Hủy</button>
+                    <button @click="submitAddStudents" class="px-4 py-2 bg-[#16a34a] text-white font-bold rounded hover:bg-green-700 shadow">Xác nhận thêm ({{ selectedUserIds.length }})</button>
                 </div>
             </div>
+        </Modal>
+
+<Modal :show="showAddDocModal" @close="showAddDocModal = false" maxWidth="md">
+            <form @submit.prevent="submitAddDoc" class="p-6 bg-white">
+                <h3 class="text-lg font-bold text-gray-800 mb-4 border-b border-gray-200 pb-2">Thêm tài liệu mới</h3>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-bold text-gray-700 mb-1">Tên tài liệu: <span class="text-red-500">*</span></label>
+                    <input v-model="docForm.name" type="text" class="w-full border-gray-300 rounded focus:ring-blue-500 text-sm">
+                    <div v-if="docForm.errors.name" class="text-red-600 text-[13px] font-medium mt-1">{{ docForm.errors.name }}</div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-bold text-gray-700 mb-1">Loại tài liệu:</label>
+                    <select v-model="docForm.type" class="w-full border-gray-300 rounded focus:ring-blue-500 text-sm">
+                        <option value="pdf">File PDF</option>
+                        <option value="doc">File Word</option>
+                        <option value="pptx">File PowerPoint</option>
+                        <option value="video">File Video</option>
+                        <option value="link">Link đính kèm</option>
+                    </select>
+                    <div v-if="docForm.errors.type" class="text-red-600 text-[13px] font-medium mt-1">{{ docForm.errors.type }}</div>
+                </div>
+
+                <div v-if="docForm.type === 'link'" class="mb-4">
+                    <label class="block text-sm font-bold text-gray-700 mb-1">Đường dẫn (URL): <span class="text-red-500">*</span></label>
+                    <input v-model="docForm.url" type="url" placeholder="https://..." class="w-full border-gray-300 rounded focus:ring-blue-500 text-sm">
+                    <div v-if="docForm.errors.url" class="text-red-600 text-[13px] font-medium mt-1">{{ docForm.errors.url }}</div>
+                </div>
+
+                <div v-else class="mb-6">
+                    <label class="block text-sm font-bold text-gray-700 mb-1">Chọn File: <span class="text-red-500">*</span></label>
+                    <input type="file" @input="docForm.file = $event.target.files[0]" class="w-full border border-gray-300 p-1.5 rounded text-sm bg-gray-50">
+                    <p class="text-xs text-gray-500 mt-1">Dung lượng tối đa: 20MB.</p>
+                    <div v-if="docForm.errors.file" class="text-red-600 text-[13px] font-medium mt-1">{{ docForm.errors.file }}</div>
+                </div>
+
+                <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                    <button type="button" @click="showAddDocModal = false" class="px-4 py-2 text-gray-600 font-bold border border-gray-300 rounded hover:bg-gray-100 transition">Hủy</button>
+                    <button type="submit" :disabled="docForm.processing" class="px-4 py-2 bg-[#d97706] text-white font-bold rounded hover:bg-orange-600 shadow disabled:opacity-50 transition">
+                        <span v-if="docForm.processing">Đang tải lên...</span>
+                        <span v-else>Tải lên</span>
+                    </button>
+                </div>
+            </form>
         </Modal>
 
     </AuthenticatedLayout>
