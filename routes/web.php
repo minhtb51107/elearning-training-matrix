@@ -76,9 +76,10 @@ Route::middleware('auth')->group(function () {
     // CỤM ROUTE DÀNH CHO NHÂN VIÊN (ROLE 3)
     // ==============================================================
     Route::prefix('employee')->name('employee.')->group(function () {
-        Route::get('/courses', function () { return Inertia::render('Employee/Courses/Index'); })->name('courses.index');
-        Route::get('/courses/{id}', function () { return Inertia::render('Employee/Courses/Show'); })->name('courses.show');
-        Route::get('/my-classes', function () { return Inertia::render('Employee/MyClasses/Index'); })->name('my-classes');
+        Route::get('/courses', [\App\Http\Controllers\Employee\CourseController::class, 'index'])->name('courses.index');
+        Route::get('/courses/{id}', [\App\Http\Controllers\Employee\CourseController::class, 'show'])->name('courses.show');
+        Route::post('/classes/{id}/enroll', [\App\Http\Controllers\Employee\CourseController::class, 'enroll'])->name('classes.enroll');
+        Route::get('/my-classes', [\App\Http\Controllers\Employee\MyClassController::class, 'index'])->name('my-classes');
         Route::get('/my-schedule', function () { return Inertia::render('Employee/MySchedule/Index'); })->name('my-schedule');
         Route::get('/results', function () { return Inertia::render('Employee/Results/Index'); })->name('results');
         Route::get('/account', function () { return Inertia::render('Employee/Account/Index'); })->name('account');

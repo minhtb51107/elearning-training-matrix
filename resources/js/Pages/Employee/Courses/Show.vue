@@ -1,40 +1,35 @@
 <script setup>
 import { ref } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import Modal from '@/Components/Modal.vue';
+
+// 1. Nhận dữ liệu THẬT từ Controller truyền sang
+const props = defineProps({
+    course: Object
+});
 
 const activeTab = ref('Giới thiệu');
 const showConfirmModal = ref(false);
 const selectedClass = ref(null);
-
-const course = {
-    name: 'QUẢN LÝ TRUYỀN THÔNG DỰ ÁN',
-    overview: [
-        '- Mục tiêu khóa/lớp học',
-        '- Đối tượng tham gia',
-        '- Yêu cầu đầu vào (nếu có)',
-        '- Điều kiện đạt: Điểm >= 70 / Đạt đánh giá',
-        '- Thời lượng: 8h',
-        '- Tài liệu cung cấp: slide, link học, v.v.'
-    ],
-    content: [
-        { title: 'Bài 1: Giới thiệu kỹ năng bán hàng', time: '05 min' },
-        { title: 'Bài 2: Nhiệm vụ của nhân viên sales', time: '45 min' },
-        { title: 'Bài 3: Xử lý từ chối khách hàng', time: '05 min' },
-        { title: 'Bài 4: Thực hành tình huống', time: '20 min' },
-    ],
-    classes: [
-        { id: 1, name: 'LỚP TRUYỀN THÔNG 1', time: '08:00 - 10:00 | 01/03 - 30/03', instructor: 'Nguyễn Văn B', slot: '5/30', isFull: false },
-        { id: 2, name: 'LỚP TRUYỀN THÔNG 2', time: '18:00 - 20:00 | 01/03 - 30/03', instructor: 'Nguyễn Văn C', slot: 'ĐÃ ĐỦ SỐ LƯỢNG', isFull: true },
-    ]
-};
 
 const openConfirmModal = (cls) => {
     selectedClass.value = cls;
     showConfirmModal.value = true;
 };
 const closeConfirmModal = () => showConfirmModal.value = false;
+
+// 2. Hàm gọi API để lưu đăng ký vào Database
+const confirmEnrollment = () => {
+    if (!selectedClass.value) return;
+    
+    router.post(route('employee.classes.enroll', selectedClass.value.id), {}, {
+        preserveScroll: true,
+        onSuccess: () => {
+            closeConfirmModal();
+        }
+    });
+};
 </script>
 
 <template>
@@ -43,6 +38,11 @@ const closeConfirmModal = () => showConfirmModal.value = false;
     <AuthenticatedLayout>
         <div class="py-6">
             <div class="max-w-5xl mx-auto sm:px-6 lg:px-8">
+                
+                <div v-if="$page.props.flash?.success" class="mb-6 bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded shadow-sm">
+                    {{ $page.props.flash.success }}
+                </div>
+
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-8 border border-gray-200">
                     
                     <div class="mb-6">
@@ -73,15 +73,22 @@ const closeConfirmModal = () => showConfirmModal.value = false;
                         <div>
                             <h3 class="font-bold text-gray-800 mb-4">Danh sách lớp học:</h3>
                             <div class="space-y-4">
+                                <div v-if="!course.classes || course.classes.length === 0" class="text-gray-500 italic p-4 border border-gray-200 bg-gray-50">
+                                    Khóa học này hiện chưa có lớp nào đang mở.
+                                </div>
+
                                 <div v-for="cls in course.classes" :key="cls.id" class="border border-gray-300 p-5 rounded-sm relative shadow-sm">
-                                    <h4 class="text-base font-bold text-gray-800 mb-1">{{ cls.name }}</h4>
-                                    <p class="text-[13px] text-gray-800 font-bold mb-3">{{ cls.time }}</p>
+                                    <h4 class="text-base font-bold text-gray-800 mb-1">LỚP: {{ cls.name }}</h4>
+                                    <p class="text-[13px] text-gray-800 font-bold mb-3">Ngày dự kiến: {{ cls.time }}</p>
                                     <p class="text-[14px] text-gray-800 font-bold mb-1">Giảng viên: {{ cls.instructor }}</p>
                                     
                                     <p v-if="!cls.isFull" class="text-[14px] text-gray-800 font-bold">Còn trống: {{ cls.slot }}</p>
                                     <p v-else class="text-[14px] font-bold text-red-600">{{ cls.slot }}</p>
 
-                                    <button v-if="!cls.isFull" @click="openConfirmModal(cls)" class="absolute right-5 bottom-5 bg-[#b7eb8f] hover:bg-[#95de64] text-gray-900 border border-[#95de64] font-bold py-1.5 px-6 rounded-sm shadow-sm transition text-[13px]">
+                                    <button v-if="cls.isEnrolled" disabled class="absolute right-5 bottom-5 bg-gray-200 text-gray-500 border border-gray-300 font-bold py-1.5 px-6 rounded-sm text-[13px] cursor-not-allowed">
+                                        Đã đăng ký
+                                    </button>
+                                    <button v-else-if="!cls.isFull" @click="openConfirmModal(cls)" class="absolute right-5 bottom-5 bg-[#b7eb8f] hover:bg-[#95de64] text-gray-900 border border-[#95de64] font-bold py-1.5 px-6 rounded-sm shadow-sm transition text-[13px]">
                                         Đăng ký lớp
                                     </button>
                                 </div>
@@ -134,7 +141,7 @@ const closeConfirmModal = () => showConfirmModal.value = false;
                 <p class="text-[15px] text-gray-700 mb-6">Bạn có chắc chắn muốn đăng ký tham gia <strong>{{ selectedClass?.name }}</strong> không?</p>
                 <div class="flex justify-center gap-4">
                     <button @click="closeConfirmModal" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-6 rounded transition">Hủy</button>
-                    <button @click="closeConfirmModal" class="bg-[#b7eb8f] hover:bg-[#95de64] text-gray-900 border border-[#95de64] font-bold py-2 px-6 rounded transition">Xác nhận</button>
+                    <button @click="confirmEnrollment" class="bg-[#b7eb8f] hover:bg-[#95de64] text-gray-900 border border-[#95de64] font-bold py-2 px-6 rounded transition">Xác nhận</button>
                 </div>
             </div>
         </Modal>
