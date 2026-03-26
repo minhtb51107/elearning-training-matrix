@@ -36,4 +36,20 @@ class Course extends Model
     {
         return $this->hasMany(CourseClass::class);
     }
+
+    // Sửa lại hàm documents() trong file App\Models\Course.php
+    public function documents()
+    {
+        return $this->hasMany(CourseDocument::class); 
+    }
+
+    public function lessons()
+    {
+        return $this->hasMany(CourseLesson::class)->orderBy('order_num');
+    }
+
+    public function assignments()
+    {
+        return $this->hasMany(Assignment::class);
+    }
 }

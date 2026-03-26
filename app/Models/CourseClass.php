@@ -32,8 +32,12 @@ class CourseClass extends Model
         return $this->hasMany(ClassSession::class, 'course_class_id');
     }
 
-    // 👇 THÊM HÀM NÀY 👇
     public function documents() {
         return $this->hasMany(Document::class, 'course_class_id');
+    }
+
+    public function submissions()
+    {
+        return $this->hasMany(Submission::class);
     }
 }

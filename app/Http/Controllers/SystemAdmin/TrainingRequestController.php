@@ -4,25 +4,23 @@ namespace App\Http\Controllers\SystemAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Models\TrainingRequest;
+use App\Models\User;
+use App\Notifications\SystemNotification;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class TrainingRequestController extends Controller
 {
-    // 1. Màn hình danh sách duyệt Yêu cầu (BA Spec 4.2.2)
     public function index(Request $request)
     {
-        // Admin hệ thống xem được tất cả yêu cầu, NGOẠI TRỪ các bản nháp (draft) của phòng ban
         $query = TrainingRequest::with(['department', 'requester'])
             ->where('status', '!=', 'draft')
             ->latest();
 
-        // Lọc theo Tab trạng thái (pending, approved, rejected, processed)
         if ($request->filled('tab') && $request->tab !== 'all') {
             $query->where('status', $request->tab);
         }
 
-        // Lọc theo keyword (Mã YC hoặc Tên khóa)
         if ($request->filled('keyword')) {
             $query->where(function($q) use ($request) {
                 $q->where('course_name', 'like', '%' . $request->keyword . '%')
@@ -38,10 +36,8 @@ class TrainingRequestController extends Controller
         ]);
     }
 
-    // 2. Màn hình chi tiết duyệt Yêu cầu (BA Spec 4.2.3)
     public function show(TrainingRequest $trainingRequest)
     {
-        // Chặn không cho xem bản nháp của phòng ban
         if ($trainingRequest->status === 'draft') {
             abort(404, 'Không tìm thấy yêu cầu đào tạo.');
         }
@@ -53,17 +49,14 @@ class TrainingRequestController extends Controller
         ]);
     }
 
-    // 3. Xử lý logic Duyệt / Từ chối
     public function updateStatus(Request $request, TrainingRequest $trainingRequest)
     {
-        // Chỉ cho phép xử lý khi YC đang ở trạng thái "Chờ duyệt" (pending)
         if ($trainingRequest->status !== 'pending') {
             return back()->with('error', 'Yêu cầu này đã được xử lý trước đó.');
         }
 
         $validated = $request->validate([
             'status' => 'required|in:approved,rejected',
-            // Nếu chọn 'rejected' (Từ chối) thì bắt buộc phải nhập lý do
             'hr_feedback' => 'required_if:status,rejected|nullable|string' 
         ], [
             'hr_feedback.required_if' => 'Bạn phải nhập lý do khi từ chối yêu cầu đào tạo này.'
@@ -74,10 +67,47 @@ class TrainingRequestController extends Controller
             'hr_feedback' => $validated['hr_feedback']
         ]);
 
-        $message = $validated['status'] === 'approved' 
-            ? 'Đã DUYỆT yêu cầu đào tạo thành công!' 
-            : 'Đã TỪ CHỐI yêu cầu đào tạo.';
+        // 👉 BẮN THÔNG BÁO CHO TRƯỞNG PHÒNG ĐÃ TẠO YÊU CẦU NÀY
+        $requester = User::find($trainingRequest->requester_id);
+        if ($requester) {
+            $statusText = $validated['status'] === 'approved' ? '<span class="text-green-600">chấp thuận</span>' : '<span class="text-red-600">từ chối</span>';
+            $requester->notify(new SystemNotification(
+                'Kết quả Yêu cầu Đào tạo',
+                'Yêu cầu khóa học <strong>' . $trainingRequest->course_name . '</strong> của bạn đã bị ' . $statusText . '.',
+                route('department.requests.show', $trainingRequest->id)
+            ));
+        }
 
+        $message = $validated['status'] === 'approved' ? 'Đã DUYỆT yêu cầu đào tạo thành công!' : 'Đã TỪ CHỐI yêu cầu đào tạo.';
         return redirect()->route('system.requests.index')->with('success', $message);
+    }
+    
+    public function bulkApprove(\Illuminate\Http\Request $request)
+    {
+        $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'exists:training_requests,id'
+        ]);
+
+        $requests = TrainingRequest::whereIn('id', $request->ids)->get();
+
+        foreach ($requests as $req) {
+            $req->update([
+                'status' => 'approved',
+                'updated_at' => now()
+            ]);
+
+            // 👉 BẮN THÔNG BÁO CHO TỪNG TRƯỞNG PHÒNG CỦA CÁC YÊU CẦU ĐƯỢC DUYỆT HÀNG LOẠT
+            $requester = User::find($req->requester_id);
+            if ($requester) {
+                $requester->notify(new SystemNotification(
+                    'Kết quả Yêu cầu Đào tạo',
+                    'Yêu cầu khóa học <strong>' . $req->course_name . '</strong> của bạn đã được <span class="text-green-600">chấp thuận</span>.',
+                    route('department.requests.show', $req->id)
+                ));
+            }
+        }
+
+        return back()->with('success', 'Đã duyệt thành công ' . count($request->ids) . ' yêu cầu!');
     }
 }

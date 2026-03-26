@@ -3,13 +3,24 @@ import { ref, computed } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import Modal from '@/Components/Modal.vue';
+import { 
+    ChevronLeftIcon, 
+    UsersIcon, 
+    DocumentTextIcon, 
+    LinkIcon, 
+    XMarkIcon, 
+    UserPlusIcon, 
+    ArrowUpTrayIcon,
+    MagnifyingGlassIcon
+} from '@heroicons/vue/20/solid';
 
 const props = defineProps({
     courseClass: Object,
-    availableUsers: Array
+    availableUsers: Array,
+    resultsData: Array // Hứng data điểm từ Controller
 });
 
-const activeTab = ref('Thông tin');
+const activeTab = ref('Học viên'); 
 
 const formatTimeRange = (start, end) => {
     if (!start || !end) return '--';
@@ -26,10 +37,9 @@ const cls = computed(() => ({
     status: props.courseClass.status.toUpperCase(),
     instructor: props.courseClass.instructor?.name || 'Chưa phân công',
     students_count: `${props.courseClass.enrollments?.length || 0} / ${props.courseClass.max_students}`,
-    shift: 'Sáng',
+    shift: props.courseClass.shift || 'Chưa xác định', 
     scope: props.courseClass.department?.name || 'Toàn công ty',
     max_students: props.courseClass.max_students,
-    note: ''
 }));
 
 const changeStatus = (newStatus) => {
@@ -54,13 +64,41 @@ const students = computed(() => {
         email: enrol.user.email,
         status: statusMap[enrol.status] || enrol.status, 
         score: enrol.final_score || '-',
-        result: enrol.status === 'completed' ? 'Đạt' : (enrol.status === 'failed' ? 'Chưa đạt' : '-'),
-        remark: '-'
     }));
 });
 
+// ==========================================
+// LOGIC MODAL THÊM HỌC VIÊN + TÌM KIẾM XỊN
+// ==========================================
 const showAddStudentModal = ref(false);
 const selectedUserIds = ref([]);
+const searchQuery = ref('');
+
+const filteredUsers = computed(() => {
+    if (!searchQuery.value) return props.availableUsers;
+    const lowerQuery = searchQuery.value.toLowerCase();
+    
+    return props.availableUsers.filter(user => 
+        user.name.toLowerCase().includes(lowerQuery) ||
+        user.email.toLowerCase().includes(lowerQuery) ||
+        (user.department?.name || '').toLowerCase().includes(lowerQuery)
+    );
+});
+
+const isAllSelected = computed(() => {
+    if (filteredUsers.value.length === 0) return false;
+    return filteredUsers.value.every(user => selectedUserIds.value.includes(user.id));
+});
+
+const toggleSelectAll = (e) => {
+    if (e.target.checked) {
+        const newIds = filteredUsers.value.map(u => u.id);
+        selectedUserIds.value = [...new Set([...selectedUserIds.value, ...newIds])];
+    } else {
+        const filteredIds = filteredUsers.value.map(u => u.id);
+        selectedUserIds.value = selectedUserIds.value.filter(id => !filteredIds.includes(id));
+    }
+};
 
 const submitAddStudents = () => {
     if(selectedUserIds.value.length === 0) return alert('Vui lòng chọn ít nhất 1 học viên');
@@ -70,6 +108,7 @@ const submitAddStudents = () => {
         onSuccess: () => {
             showAddStudentModal.value = false;
             selectedUserIds.value = [];
+            searchQuery.value = '';
         },
         preserveScroll: true
     });
@@ -85,13 +124,13 @@ const removeStudent = (studentId, studentName) => {
 };
 
 // ==========================================
-// LOGIC QUẢN LÝ TÀI LIỆU
+// LOGIC TÀI LIỆU
 // ==========================================
 const documents = computed(() => {
     return (props.courseClass.documents || []).map(doc => ({
         id: doc.id,
         name: doc.name,
-        type: doc.type.toUpperCase(),
+        type: doc.type,
         date: new Date(doc.created_at).toLocaleDateString('vi-VN'),
         url: doc.url
     }));
@@ -100,22 +139,14 @@ const documents = computed(() => {
 const showAddDocModal = ref(false);
 const docForm = useForm({
     name: '',
-    type: 'pdf',
+    type: 'file',
     file: null,
     url: ''
 });
 
 const submitAddDoc = () => {
-    // Nếu upload file vật lý
-    if (docForm.type !== 'link' && !docForm.file) {
-        alert('Vui lòng chọn một file để tải lên!');
-        return;
-    }
-    // Nếu up link
-    if (docForm.type === 'link' && !docForm.url) {
-        alert('Vui lòng nhập đường dẫn URL!');
-        return;
-    }
+    if (docForm.type !== 'link' && !docForm.file) return alert('Vui lòng chọn file tải lên!');
+    if (docForm.type === 'link' && !docForm.url) return alert('Vui lòng nhập đường dẫn URL!');
 
     docForm.post(route('system.classes.upload-document', props.courseClass.id), {
         onSuccess: () => {
@@ -137,252 +168,344 @@ const deleteDoc = (doc) => {
     <Head :title="'Chi tiết lớp học: ' + cls.code" />
 
     <AuthenticatedLayout>
-        <div class="py-6">
-            <div class="max-w-5xl mx-auto sm:px-6 lg:px-8">
+        <template #header>
+            <Link :href="route('system.classes.index')" class="flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-blue-600 transition-colors">
+                <ChevronLeftIcon class="w-4 h-4" />
+                Quay lại danh sách Lớp học
+            </Link>
+        </template>
+
+        <div class="py-8">
+            <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
                 
-                <div v-if="$page.props.flash?.success" class="mb-4 bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded shadow-sm">
-                    {{ $page.props.flash.success }}
+                <div v-if="$page.props.flash?.success" class="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg shadow-sm">
+                    <span class="font-medium">{{ $page.props.flash.success }}</span>
                 </div>
 
-                <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-8 border border-gray-200">
+                <div class="bg-white overflow-hidden shadow-sm sm:rounded-xl border border-gray-200">
                     
-                    <div class="mb-4">
-                        <Link :href="route('system.classes.index')" class="text-lg font-bold text-gray-800 hover:text-gray-500 transition">
-                            &lt; Quay lại
-                        </Link>
-                    </div>
-
-                    <div class="mb-6">
-                        <h2 class="text-xl font-bold text-gray-800 uppercase mb-4">{{ cls.name }}</h2>
-                        <div class="grid grid-cols-[100px_1fr] gap-y-2 text-[15px] mb-6">
-                            <span class="font-bold text-gray-800">Mã lớp:</span> <span>{{ cls.code }}</span>
-                            <span class="font-bold text-gray-800">Thời gian:</span> <span>{{ cls.time }}</span>
-                            <span class="font-bold text-gray-800 mt-1">Trạng thái:</span> 
-                            <span class="font-bold mt-1 uppercase" 
-                                  :class="{
-                                      'text-[#16a34a]': cls.status === 'MỞ ĐĂNG KÝ', 
-                                      'text-[#d97706]': cls.status === 'ĐANG HỌC', 
-                                      'text-[#dc2626]': cls.status === 'KẾT THÚC',
-                                      'text-gray-500': cls.status === 'NHÁP'
-                                  }">
-                                {{ cls.status }}
-                            </span>
-                        </div>
-
-                        <div class="flex items-center gap-12 text-[15px] border-b border-gray-300 pb-8 relative">
-                            <div class="absolute right-0 top-[-90px] text-right">
-                                <p><span class="font-bold text-gray-800">Giảng viên:</span> {{ cls.instructor }}</p>
-                                <p class="mt-2"><span class="font-bold text-gray-800">Số lượng:</span> <span class="text-blue-600 font-bold">{{ cls.students_count }}</span></p>
+                    <div class="px-8 py-6 border-b border-gray-100 bg-gray-50/50">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <div class="flex items-center gap-3 mb-1">
+                                    <span class="bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-md text-xs font-bold border border-blue-200">{{ cls.code }}</span>
+                                    <span class="text-xs font-semibold px-2.5 py-0.5 rounded-md border uppercase" 
+                                          :class="{
+                                              'bg-green-50 text-green-700 border-green-200': cls.status === 'MỞ ĐĂNG KÝ', 
+                                              'bg-yellow-50 text-yellow-700 border-yellow-200': cls.status === 'ĐANG HỌC', 
+                                              'bg-blue-50 text-blue-700 border-blue-200': cls.status === 'KẾT THÚC',
+                                              'bg-gray-100 text-gray-600 border-gray-200': cls.status === 'NHÁP'
+                                          }">
+                                        {{ cls.status }}
+                                    </span>
+                                </div>
+                                <h2 class="text-2xl font-bold text-gray-900 mt-2">{{ cls.name }}</h2>
+                                <p class="text-sm text-gray-500 mt-1">Giảng viên: <span class="font-semibold text-gray-700">{{ cls.instructor }}</span> | Thời gian: <span class="font-semibold text-gray-700">{{ cls.time }}</span></p>
                             </div>
                             
-                            <button v-if="cls.status === 'MỞ ĐĂNG KÝ'" @click="changeStatus('Đang học')" class="text-[#16a34a] hover:text-green-700 font-bold uppercase transition">
-                                [ BẮT ĐẦU HỌC ]
-                            </button>
-                            <button v-if="cls.status === 'ĐANG HỌC'" @click="changeStatus('Kết thúc')" class="text-[#c93b42] hover:text-red-800 font-bold uppercase transition">
-                                [ Kết thúc ]
-                            </button>
-                            <button v-if="cls.status === 'KẾT THÚC'" @click="changeStatus('Mở đăng ký')" class="text-[#16a34a] hover:text-green-700 font-bold uppercase transition">
-                                [ Mở lại khóa học ]
-                            </button>
-                            <button v-if="cls.status === 'NHÁP'" @click="changeStatus('Mở đăng ký')" class="text-blue-600 hover:text-blue-800 font-bold uppercase transition">
-                                [ XUẤT BẢN / MỞ ĐĂNG KÝ ]
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="flex items-center gap-6 mb-8 text-[15px] font-bold text-gray-500 justify-center border-b border-gray-200">
-                        <button @click="activeTab = 'Thông tin'" :class="['pb-3 px-2 transition border-b-4', activeTab === 'Thông tin' ? 'text-gray-900 border-gray-800' : 'border-transparent hover:text-gray-800']">Thông tin</button>
-                        <span class="text-gray-300 pb-3">|</span>
-                        <button @click="activeTab = 'Học viên'" :class="['pb-3 px-2 transition border-b-4', activeTab === 'Học viên' ? 'text-gray-900 border-gray-800' : 'border-transparent hover:text-gray-800']">Học viên</button>
-                        <span class="text-gray-300 pb-3">|</span>
-                        <button @click="activeTab = 'Tài liệu'" :class="['pb-3 px-2 transition border-b-4', activeTab === 'Tài liệu' ? 'text-gray-900 border-gray-800' : 'border-transparent hover:text-gray-800']">Tài liệu</button>
-                        <span class="text-gray-300 pb-3">|</span>
-                        <button @click="activeTab = 'Kết quả'" :class="['pb-3 px-2 transition border-b-4', activeTab === 'Kết quả' ? 'text-gray-900 border-gray-800' : 'border-transparent hover:text-gray-800']">Kết quả</button>
-                    </div>
-
-                    <div v-if="activeTab === 'Thông tin'" class="bg-[#f3f4f6] p-8 rounded-sm border border-gray-300 text-[15px]">
-                        <h3 class="font-bold text-gray-800 mb-6">Thông tin khóa học:</h3>
-                        <div class="grid grid-cols-2 gap-x-12 gap-y-4 text-gray-800">
-                            <div>
-                                <p class="mb-3 font-bold">Tên lớp: <span class="font-normal ml-2 bg-white px-3 py-1 border border-gray-300 rounded shadow-sm inline-block min-w-[200px]">[ {{ cls.name }} ]</span></p>
-                                <p class="mb-3 font-bold">Ca học: <span class="font-normal ml-2 bg-white px-3 py-1 border border-gray-300 rounded shadow-sm inline-block min-w-[100px]">[ {{ cls.shift }} ▼ ]</span></p>
-                                <p class="mb-3 font-bold">Phạm vi: <span class="font-normal ml-2 bg-white px-3 py-1 border border-gray-300 rounded shadow-sm inline-block min-w-[200px]">[ {{ cls.scope }} ]</span></p>
-                                <p class="mb-3 font-bold">SL tối đa: <span class="font-normal ml-2 bg-white px-3 py-1 border border-gray-300 rounded shadow-sm inline-block min-w-[100px]">[ {{ cls.max_students }} ]</span></p>
-                            </div>
-                            <div>
-                                <p class="mb-4 font-bold">Giảng viên: <span class="font-normal ml-2">{{ cls.instructor }}</span></p>
-                                <p class="font-bold mb-2">Thời gian học:</p>
-                                <p class="mb-2">- Từ ngày: <span class="font-normal ml-2 bg-white px-3 py-1 border border-gray-300 rounded shadow-sm inline-block min-w-[150px]">[ {{ new Date(courseClass.start_date).toLocaleDateString('vi-VN') }} ]</span></p>
-                                <p class="mb-2">- Đến ngày: <span class="font-normal ml-2 bg-white px-3 py-1 border border-gray-300 rounded shadow-sm inline-block min-w-[150px]">[ {{ new Date(courseClass.end_date).toLocaleDateString('vi-VN') }} ]</span></p>
+                            <div class="flex gap-3">
+                                <button v-if="cls.status === 'MỞ ĐĂNG KÝ'" @click="changeStatus('Đang học')" class="px-5 py-2 bg-green-600 text-white rounded-lg font-semibold text-sm hover:bg-green-700 transition shadow-sm shadow-green-600/30">
+                                    BẮT ĐẦU HỌC
+                                </button>
+                                <button v-if="cls.status === 'ĐANG HỌC'" @click="changeStatus('Kết thúc')" class="px-5 py-2 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700 transition shadow-sm shadow-blue-600/30">
+                                    KẾT THÚC LỚP
+                                </button>
+                                <button v-if="cls.status === 'KẾT THÚC'" @click="changeStatus('Mở đăng ký')" class="px-5 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg font-semibold text-sm hover:bg-gray-50 transition shadow-sm">
+                                    MỞ LẠI LỚP NÀY
+                                </button>
+                                <button v-if="cls.status === 'NHÁP'" @click="changeStatus('Mở đăng ký')" class="px-5 py-2 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700 transition shadow-sm shadow-blue-600/30">
+                                    XUẤT BẢN & MỞ ĐĂNG KÝ
+                                </button>
                             </div>
                         </div>
                     </div>
 
-                    <div v-if="activeTab === 'Học viên'">
-                        <h3 class="text-base font-bold text-gray-800 mb-4">Danh sách học viên ({{ students.length }})</h3>
-                        <div class="flex gap-6 text-[#16a34a] font-bold text-[15px] mb-4">
-                            <button @click="showAddStudentModal = true" class="hover:underline transition">[ + THÊM HỌC VIÊN ]</button>
-                            <button class="hover:underline transition text-gray-500">[ XUẤT FILE EXCEL ]</button>
-                        </div>
-                        <div class="overflow-x-auto border border-gray-300">
-                            <table class="min-w-full divide-y divide-gray-300 text-center text-[14px]">
-                                <thead class="bg-[#dcfce7]">
-                                    <tr>
-                                        <th class="px-4 py-3 font-bold text-gray-900 border-r border-gray-300">Nhân viên</th>
-                                        <th class="px-4 py-3 font-bold text-gray-900 border-r border-gray-300">Phòng ban</th>
-                                        <th class="px-4 py-3 font-bold text-gray-900 border-r border-gray-300">Email</th>
-                                        <th class="px-4 py-3 font-bold text-gray-900 border-r border-gray-300">Trạng thái</th>
-                                        <th class="px-4 py-3 font-bold text-gray-900 border-r border-gray-300">Điểm</th>
-                                        <th class="px-4 py-3 font-bold text-gray-900">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="bg-white divide-y divide-gray-300">
-                                    <tr v-if="students.length === 0">
-                                        <td colspan="6" class="px-4 py-6 text-gray-500 italic">Lớp học này chưa có học viên nào.</td>
-                                    </tr>
-                                    <tr v-for="stu in students" :key="stu.id" class="hover:bg-gray-50 transition">
-                                        <td class="px-4 py-3 border-r border-gray-300 text-gray-700 font-bold text-left">{{ stu.name }}</td>
-                                        <td class="px-4 py-3 border-r border-gray-300 text-gray-800">{{ stu.department }}</td>
-                                        <td class="px-4 py-3 border-r border-gray-300 text-gray-700 text-left">{{ stu.email }}</td>
-                                        <td class="px-4 py-3 border-r border-gray-300 text-gray-800">{{ stu.status }}</td>
-                                        <td class="px-4 py-3 border-r border-gray-300 text-gray-800 font-bold">{{ stu.score }}</td>
-                                        <td class="px-4 py-3">
-                                            <button @click="removeStudent(stu.id, stu.name)" class="text-red-600 hover:text-red-800 font-medium hover:underline">
-                                                [ Gỡ ]
-                                            </button>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <div v-if="activeTab === 'Tài liệu'">
-                        <h3 class="text-base font-bold text-gray-800 mb-4 border-b border-gray-300 pb-2">Tài liệu lớp học ({{ documents.length }})</h3>
-                        <div class="mb-4">
-                            <button @click="showAddDocModal = true" class="text-[#d97706] font-bold text-[15px] hover:underline transition">
-                                [ + TẢI LÊN TÀI LIỆU ]
+                    <div class="px-8 border-b border-gray-200 bg-white">
+                        <nav class="-mb-px flex space-x-8">
+                            <button @click="activeTab = 'Thông tin'" :class="['whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors', activeTab === 'Thông tin' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300']">Thông tin chung</button>
+                            <button @click="activeTab = 'Học viên'" :class="['whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2', activeTab === 'Học viên' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300']">
+                                Học viên <span class="bg-gray-100 text-gray-600 py-0.5 px-2 rounded-full text-xs font-mono">{{ students.length }} / {{ cls.max_students }}</span>
                             </button>
-                        </div>
-                        <div class="overflow-x-auto border border-gray-300 w-full md:w-3/4">
-                            <table class="min-w-full divide-y divide-gray-300 text-center text-[14px]">
-                                <thead class="bg-[#fcd38e]">
-                                    <tr>
-                                        <th class="px-4 py-3 font-bold text-gray-900 border-r border-gray-300">Tên tài liệu</th>
-                                        <th class="px-4 py-3 font-bold text-gray-900 border-r border-gray-300">Loại</th>
-                                        <th class="px-4 py-3 font-bold text-gray-900 border-r border-gray-300">Ngày tải lên</th>
-                                        <th class="px-4 py-3 font-bold text-gray-900">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="bg-white divide-y divide-gray-300">
-                                    <tr v-if="documents.length === 0">
-                                        <td colspan="4" class="px-4 py-6 text-gray-500 italic">Lớp học này chưa có tài liệu nào.</td>
-                                    </tr>
-                                    <tr v-for="doc in documents" :key="doc.id" class="hover:bg-gray-50 transition">
-                                        <td class="px-4 py-3 border-r border-gray-300 text-blue-600 font-bold text-left">
-                                           <a :href="doc.url" 
-   target="_blank" 
-   :download="doc.type !== 'LINK' ? doc.name : false" 
-   class="text-[#0ea5e9] hover:text-blue-800 hover:underline font-bold transition">
-    {{ doc.name }}
-</a>
-                                        </td>
-                                        <td class="px-4 py-3 border-r border-gray-300 text-gray-700">{{ doc.type }}</td>
-                                        <td class="px-4 py-3 border-r border-gray-300 text-gray-700">{{ doc.date }}</td>
-                                        <td class="px-4 py-3">
-                                            <button @click="deleteDoc(doc)" class="text-[#c93b42] hover:underline font-medium">[ Xóa ]</button>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
+                            <button @click="activeTab = 'Tài liệu'" :class="['whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2', activeTab === 'Tài liệu' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300']">
+                                Tài liệu <span class="bg-gray-100 text-gray-600 py-0.5 px-2 rounded-full text-xs font-mono">{{ documents.length }}</span>
+                            </button>
+                            <button @click="activeTab = 'Kết quả'" :class="['whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors', activeTab === 'Kết quả' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300']">Kết quả & Điểm</button>
+                        </nav>
                     </div>
 
-                    <div v-if="activeTab === 'Kết quả'">
-                        <h3 class="text-base font-bold text-gray-800 mb-6 border-b border-gray-300 pb-2">Kết quả - Thống kê</h3>
-                        <p class="text-gray-500 italic text-center">Chức năng thống kê điểm đang được phát triển...</p>
-                    </div>
+                    <div class="p-8">
+                        
+                        <div v-if="activeTab === 'Thông tin'" class="max-w-3xl">
+                            <div class="bg-gray-50/80 p-6 rounded-xl border border-gray-100">
+                                <h3 class="font-bold text-gray-900 mb-6 uppercase text-sm tracking-wider">Cấu hình lớp học</h3>
+                                <div class="grid grid-cols-2 gap-x-12 gap-y-6 text-sm">
+                                    <div>
+                                        <p class="text-gray-500 mb-1">Thuộc Khóa học</p>
+                                        <p class="font-semibold text-gray-900">{{ props.courseClass.course?.name || '--' }}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-gray-500 mb-1">Ca học</p>
+                                        <p class="font-semibold text-gray-900">{{ cls.shift }}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-gray-500 mb-1">Phạm vi tuyển sinh</p>
+                                        <p class="font-semibold text-gray-900">{{ cls.scope }}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-gray-500 mb-1">Sĩ số tối đa</p>
+                                        <p class="font-semibold text-gray-900">{{ cls.max_students }} học viên</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
+                        <div v-if="activeTab === 'Học viên'">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-base font-bold text-gray-800">Danh sách học viên</h3>
+                                <button @click="showAddStudentModal = true" class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 shadow-sm transition-colors">
+                                    <UserPlusIcon class="w-4 h-4 text-blue-600" /> Thêm học viên
+                                </button>
+                            </div>
+                            
+                            <div class="overflow-x-auto border border-gray-200 rounded-lg">
+                                <table class="min-w-full divide-y divide-gray-200 text-left text-sm whitespace-nowrap">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Nhân viên</th>
+                                            <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Phòng ban</th>
+                                            <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Email</th>
+                                            <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Trạng thái Lớp</th>
+                                            <th class="px-6 py-3"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200">
+                                        <tr v-if="students.length === 0">
+                                            <td colspan="5" class="px-6 py-8 text-center text-gray-500 italic bg-gray-50/30">Lớp học này chưa có học viên nào.</td>
+                                        </tr>
+                                        <tr v-for="stu in students" :key="stu.id" class="hover:bg-gray-50 transition-colors">
+                                            <td class="px-6 py-4 font-semibold text-gray-900">{{ stu.name }}</td>
+                                            <td class="px-6 py-4 text-gray-600">{{ stu.department }}</td>
+                                            <td class="px-6 py-4 text-gray-600">{{ stu.email }}</td>
+                                            <td class="px-6 py-4 text-center font-semibold text-gray-800">{{ stu.status }}</td>
+                                            <td class="px-6 py-4 text-right">
+                                                <button @click="removeStudent(stu.id, stu.name)" class="text-red-600 hover:text-red-800 font-medium hover:underline">Gỡ bỏ</button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div v-if="activeTab === 'Tài liệu'">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-base font-bold text-gray-800">Tài liệu riêng của Lớp</h3>
+                                <button @click="showAddDocModal = true" class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 shadow-sm transition-colors">
+                                    <ArrowUpTrayIcon class="w-4 h-4 text-blue-600" /> Tải lên tài liệu
+                                </button>
+                            </div>
+                            
+                            <div class="overflow-x-auto border border-gray-200 rounded-lg max-w-4xl">
+                                <table class="min-w-full divide-y divide-gray-200 text-left text-sm">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Tên tài liệu</th>
+                                            <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Loại</th>
+                                            <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Ngày tải lên</th>
+                                            <th class="px-6 py-3"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200">
+                                        <tr v-if="documents.length === 0">
+                                            <td colspan="4" class="px-6 py-8 text-center text-gray-500 italic bg-gray-50/30">Chưa có tài liệu nào được đính kèm.</td>
+                                        </tr>
+                                        <tr v-for="doc in documents" :key="doc.id" class="hover:bg-gray-50 transition-colors">
+                                            <td class="px-6 py-4">
+                                                <a :href="doc.url" target="_blank" :download="doc.type !== 'link' ? doc.name : false" class="text-blue-600 hover:text-blue-800 font-semibold hover:underline flex items-center gap-2">
+                                                    <DocumentTextIcon v-if="doc.type !== 'link'" class="w-4 h-4" />
+                                                    <LinkIcon v-else class="w-4 h-4" />
+                                                    {{ doc.name }}
+                                                </a>
+                                            </td>
+                                            <td class="px-6 py-4 text-gray-600 uppercase text-xs font-bold">{{ doc.type }}</td>
+                                            <td class="px-6 py-4 text-gray-600">{{ doc.date }}</td>
+                                            <td class="px-6 py-4 text-right">
+                                                <button @click="deleteDoc(doc)" class="text-red-600 hover:underline font-medium">Xóa</button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div v-if="activeTab === 'Kết quả'">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-base font-bold text-gray-800">Kết quả Học tập & Điểm số</h3>
+                                <Link :href="route('system.grades.index')" class="text-sm text-blue-600 hover:underline font-semibold bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100">
+                                    Mở Trung tâm Chấm điểm &rarr;
+                                </Link>
+                            </div>
+                            
+                            <div class="overflow-x-auto border border-gray-200 rounded-lg">
+                                <table class="min-w-full divide-y divide-gray-200 text-left text-sm whitespace-nowrap">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Học viên</th>
+                                            <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Phòng ban</th>
+                                            <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Tiến độ bài giảng</th>
+                                            <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Bài cuối khóa</th>
+                                            <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Điểm thi</th>
+                                            <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Kết quả Lớp</th>
+                                            <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Thao tác</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200">
+                                        <tr v-if="resultsData.length === 0">
+                                            <td colspan="7" class="px-6 py-8 text-center text-gray-500 italic bg-gray-50/30">Lớp học này chưa có học viên nào tham gia.</td>
+                                        </tr>
+                                        <tr v-for="res in resultsData" :key="res.user_id" class="hover:bg-gray-50 transition-colors">
+                                            <td class="px-6 py-4">
+                                                <p class="font-semibold text-gray-900">{{ res.name }}</p>
+                                                <p class="text-xs text-gray-500">{{ res.emp_code }}</p>
+                                            </td>
+                                            <td class="px-6 py-4 text-gray-600">{{ res.department }}</td>
+                                            <td class="px-6 py-4 text-center">
+                                                <span class="font-bold" :class="res.progress === 100 ? 'text-green-600' : 'text-blue-600'">{{ res.progress }}%</span>
+                                            </td>
+                                            <td class="px-6 py-4 text-center">
+                                                <span v-if="!res.has_final" class="text-gray-400 text-xs italic">Không có bài test</span>
+                                                <span v-else-if="res.submission_status === 'Chưa nộp'" class="px-2.5 py-1 bg-gray-100 text-gray-600 rounded text-xs font-medium border border-gray-200">Chưa nộp</span>
+                                                <span v-else-if="res.submission_status === 'Chờ chấm'" class="px-2.5 py-1 bg-yellow-50 text-yellow-700 rounded text-xs font-medium border border-yellow-200">Chờ chấm</span>
+                                                <span v-else class="px-2.5 py-1 bg-green-50 text-green-700 rounded text-xs font-bold border border-green-200">Đã chấm</span>
+                                            </td>
+                                            <td class="px-6 py-4 font-bold text-gray-900 text-center">{{ res.score }}</td>
+                                            <td class="px-6 py-4 text-center">
+                                                <span v-if="res.class_status === 'completed'" class="text-green-600 font-bold text-xs uppercase bg-green-50 px-2 py-0.5 rounded">Đạt</span>
+                                                <span v-else-if="res.class_status === 'failed'" class="text-red-600 font-bold text-xs uppercase bg-red-50 px-2 py-0.5 rounded">Trượt</span>
+                                                <span v-else class="text-blue-600 font-bold text-xs uppercase bg-blue-50 px-2 py-0.5 rounded">Đang học</span>
+                                            </td>
+                                            <td class="px-6 py-4 text-right">
+                                                <Link v-if="res.submission_id && res.submission_status === 'Chờ chấm'" :href="route('system.grades.show', res.submission_id)" class="text-blue-600 hover:text-blue-800 font-bold hover:underline text-sm">Chấm bài</Link>
+                                                <Link v-else-if="res.submission_id && res.submission_status === 'Đã chấm'" :href="route('system.grades.show', res.submission_id)" class="text-gray-500 hover:text-gray-800 font-medium hover:underline text-sm">Xem lại</Link>
+                                                <span v-else class="text-gray-300 text-sm">--</span>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                    </div>
                 </div>
             </div>
         </div>
 
         <Modal :show="showAddStudentModal" @close="showAddStudentModal = false" maxWidth="2xl">
-            <div class="p-6 bg-white">
-                <h3 class="text-lg font-bold text-gray-800 mb-4 border-b border-gray-200 pb-2">Thêm học viên vào lớp</h3>
-                <div class="max-h-[400px] overflow-y-auto mb-4 border border-gray-300 rounded">
-                    <table class="min-w-full text-sm text-left">
-                        <thead class="bg-gray-100 sticky top-0">
-                            <tr>
-                                <th class="px-4 py-2 w-10 text-center"><input type="checkbox" disabled></th>
-                                <th class="px-4 py-2 font-bold text-gray-800">Tên nhân viên</th>
-                                <th class="px-4 py-2 font-bold text-gray-800">Phòng ban</th>
-                                <th class="px-4 py-2 font-bold text-gray-800">Email</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-200">
-                            <tr v-if="availableUsers.length === 0">
-                                <td colspan="4" class="px-4 py-6 text-center text-gray-500 italic">Không có nhân viên nào phù hợp hoặc tất cả đã được thêm.</td>
-                            </tr>
-                            <tr v-for="user in availableUsers" :key="user.id" class="hover:bg-gray-50">
-                                <td class="px-4 py-2 text-center">
-                                    <input type="checkbox" :value="user.id" v-model="selectedUserIds" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
-                                </td>
-                                <td class="px-4 py-2 text-gray-800 font-medium">{{ user.name }}</td>
-                                <td class="px-4 py-2 text-gray-600">{{ user.department?.name || '--' }}</td>
-                                <td class="px-4 py-2 text-gray-600">{{ user.email }}</td>
-                            </tr>
-                        </tbody>
-                    </table>
+            <div class="bg-white rounded-xl overflow-hidden shadow-2xl">
+                <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                    <h3 class="text-lg font-bold text-gray-900">Thêm học viên vào lớp</h3>
+                    <button @click="showAddStudentModal = false" class="text-gray-400 hover:text-gray-600 transition-colors"><XMarkIcon class="w-6 h-6" /></button>
                 </div>
-                <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
-                    <button @click="showAddStudentModal = false" class="px-4 py-2 text-gray-600 font-bold border border-gray-300 rounded hover:bg-gray-100">Hủy</button>
-                    <button @click="submitAddStudents" class="px-4 py-2 bg-[#16a34a] text-white font-bold rounded hover:bg-green-700 shadow">Xác nhận thêm ({{ selectedUserIds.length }})</button>
+                
+                <div class="p-6">
+                    
+                    <div class="mb-4 relative">
+                        <input v-model="searchQuery" type="text" placeholder="Tìm theo tên, email, phòng ban..." class="w-full pl-10 border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm">
+                    </div>
+
+                    <div class="max-h-[350px] overflow-y-auto border border-gray-200 rounded-lg mb-6 shadow-inner relative">
+                        <table class="min-w-full text-sm text-left whitespace-nowrap">
+                            <thead class="bg-gray-100 sticky top-0 z-10 shadow-sm">
+                                <tr>
+                                    <th class="px-4 py-3 w-10 text-center">
+                                        <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer">
+                                    </th>
+                                    <th class="px-4 py-3 font-bold text-gray-700">Tên nhân viên</th>
+                                    <th class="px-4 py-3 font-bold text-gray-700">Phòng ban</th>
+                                    <th class="px-4 py-3 font-bold text-gray-700">Email</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200 bg-white">
+                                <tr v-if="filteredUsers.length === 0">
+                                    <td colspan="4" class="px-4 py-8 text-center text-gray-500 italic bg-gray-50/50">
+                                        {{ searchQuery ? 'Không tìm thấy nhân viên nào khớp với từ khóa.' : 'Tất cả nhân viên phù hợp đã được thêm vào lớp.' }}
+                                    </td>
+                                </tr>
+                                <tr v-for="user in filteredUsers" :key="user.id" class="hover:bg-blue-50/50 cursor-pointer transition-colors">
+                                    <td class="px-4 py-3 text-center">
+                                        <input type="checkbox" :value="user.id" v-model="selectedUserIds" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer">
+                                    </td>
+                                    <td class="px-4 py-3 text-gray-900 font-semibold">{{ user.name }}</td>
+                                    <td class="px-4 py-3 text-gray-600">{{ user.department?.name || '--' }}</td>
+                                    <td class="px-4 py-3 text-gray-600">{{ user.email }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <p class="text-sm text-gray-500">Đã chọn: <span class="font-bold text-blue-600">{{ selectedUserIds.length }}</span> nhân viên</p>
+                        <div class="flex gap-3">
+                            <button @click="showAddStudentModal = false" class="px-5 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">Hủy</button>
+                            <button @click="submitAddStudents" class="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-sm shadow-blue-600/30 transition-colors">Xác nhận thêm</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </Modal>
 
-<Modal :show="showAddDocModal" @close="showAddDocModal = false" maxWidth="md">
-            <form @submit.prevent="submitAddDoc" class="p-6 bg-white">
-                <h3 class="text-lg font-bold text-gray-800 mb-4 border-b border-gray-200 pb-2">Thêm tài liệu mới</h3>
+        <Modal :show="showAddDocModal" @close="showAddDocModal = false" maxWidth="md">
+            <form @submit.prevent="submitAddDoc" class="bg-white rounded-xl overflow-hidden shadow-2xl">
+                <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                    <h3 class="text-lg font-bold text-gray-900">Tải lên tài liệu mới</h3>
+                    <button type="button" @click="showAddDocModal = false" class="text-gray-400 hover:text-gray-600 transition-colors"><XMarkIcon class="w-6 h-6" /></button>
+                </div>
                 
-                <div class="mb-4">
-                    <label class="block text-sm font-bold text-gray-700 mb-1">Tên tài liệu: <span class="text-red-500">*</span></label>
-                    <input v-model="docForm.name" type="text" class="w-full border-gray-300 rounded focus:ring-blue-500 text-sm">
-                    <div v-if="docForm.errors.name" class="text-red-600 text-[13px] font-medium mt-1">{{ docForm.errors.name }}</div>
-                </div>
+                <div class="p-6">
+                    <div class="space-y-5 mb-8">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1.5">Tên hiển thị tài liệu <span class="text-red-500">*</span></label>
+                            <input v-model="docForm.name" type="text" placeholder="Ví dụ: Bài tập thực hành buổi 1" class="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 shadow-sm text-sm">
+                            <div v-if="docForm.errors.name" class="text-red-600 text-xs font-medium mt-1">{{ docForm.errors.name }}</div>
+                        </div>
 
-                <div class="mb-4">
-                    <label class="block text-sm font-bold text-gray-700 mb-1">Loại tài liệu:</label>
-                    <select v-model="docForm.type" class="w-full border-gray-300 rounded focus:ring-blue-500 text-sm">
-                        <option value="pdf">File PDF</option>
-                        <option value="doc">File Word</option>
-                        <option value="pptx">File PowerPoint</option>
-                        <option value="video">File Video</option>
-                        <option value="link">Link đính kèm</option>
-                    </select>
-                    <div v-if="docForm.errors.type" class="text-red-600 text-[13px] font-medium mt-1">{{ docForm.errors.type }}</div>
-                </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1.5">Loại đính kèm</label>
+                            <select v-model="docForm.type" class="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 shadow-sm text-sm">
+                                <option value="file">File Máy tính (PDF/Word/Excel...)</option>
+                                <option value="link">Đường dẫn Link (Web/Drive)</option>
+                            </select>
+                            <div v-if="docForm.errors.type" class="text-red-600 text-xs font-medium mt-1">{{ docForm.errors.type }}</div>
+                        </div>
 
-                <div v-if="docForm.type === 'link'" class="mb-4">
-                    <label class="block text-sm font-bold text-gray-700 mb-1">Đường dẫn (URL): <span class="text-red-500">*</span></label>
-                    <input v-model="docForm.url" type="url" placeholder="https://..." class="w-full border-gray-300 rounded focus:ring-blue-500 text-sm">
-                    <div v-if="docForm.errors.url" class="text-red-600 text-[13px] font-medium mt-1">{{ docForm.errors.url }}</div>
-                </div>
+                        <div v-if="docForm.type === 'link'">
+                            <label class="block text-sm font-medium text-gray-700 mb-1.5">Đường dẫn URL <span class="text-red-500">*</span></label>
+                            <input v-model="docForm.url" type="url" placeholder="https://..." class="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 shadow-sm text-sm">
+                            <div v-if="docForm.errors.url" class="text-red-600 text-xs font-medium mt-1">{{ docForm.errors.url }}</div>
+                        </div>
 
-                <div v-else class="mb-6">
-                    <label class="block text-sm font-bold text-gray-700 mb-1">Chọn File: <span class="text-red-500">*</span></label>
-                    <input type="file" @input="docForm.file = $event.target.files[0]" class="w-full border border-gray-300 p-1.5 rounded text-sm bg-gray-50">
-                    <p class="text-xs text-gray-500 mt-1">Dung lượng tối đa: 20MB.</p>
-                    <div v-if="docForm.errors.file" class="text-red-600 text-[13px] font-medium mt-1">{{ docForm.errors.file }}</div>
-                </div>
+                        <div v-else>
+                            <label class="block text-sm font-medium text-gray-700 mb-1.5">Chọn File <span class="text-red-500">*</span></label>
+                            <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors relative cursor-pointer">
+                                <input type="file" @input="docForm.file = $event.target.files[0]" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                                <div class="space-y-1 text-center">
+                                    <ArrowUpTrayIcon class="mx-auto h-8 w-8 text-gray-400" />
+                                    <div class="flex text-sm text-gray-600 justify-center">
+                                        <span class="font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none">Tải file lên</span>
+                                        <p class="pl-1">hoặc kéo thả vào đây</p>
+                                    </div>
+                                    <p class="text-xs text-gray-500">{{ docForm.file ? docForm.file.name : 'PDF, DOC, XLS, PPT (Tối đa 20MB)' }}</p>
+                                </div>
+                            </div>
+                            <div v-if="docForm.errors.file" class="text-red-600 text-xs font-medium mt-1">{{ docForm.errors.file }}</div>
+                        </div>
+                    </div>
 
-                <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
-                    <button type="button" @click="showAddDocModal = false" class="px-4 py-2 text-gray-600 font-bold border border-gray-300 rounded hover:bg-gray-100 transition">Hủy</button>
-                    <button type="submit" :disabled="docForm.processing" class="px-4 py-2 bg-[#d97706] text-white font-bold rounded hover:bg-orange-600 shadow disabled:opacity-50 transition">
-                        <span v-if="docForm.processing">Đang tải lên...</span>
-                        <span v-else>Tải lên</span>
-                    </button>
+                    <div class="flex justify-end gap-3">
+                        <button type="button" @click="showAddDocModal = false" class="px-5 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">Hủy bỏ</button>
+                        <button type="submit" :disabled="docForm.processing" class="inline-flex items-center gap-2 px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-sm shadow-blue-600/30 transition-colors disabled:opacity-50">
+                            <span v-if="docForm.processing" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+                            {{ docForm.processing ? 'Đang xử lý...' : 'Xác nhận tải lên' }}
+                        </button>
+                    </div>
                 </div>
             </form>
         </Modal>

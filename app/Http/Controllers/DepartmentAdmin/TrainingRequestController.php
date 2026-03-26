@@ -4,21 +4,20 @@ namespace App\Http\Controllers\DepartmentAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Models\TrainingRequest;
+use App\Models\User;
+use App\Notifications\SystemNotification;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class TrainingRequestController extends Controller
 {
-    // 1. Màn hình Danh sách YC
     public function index(Request $request)
     {
         $user = $request->user();
         
         $query = TrainingRequest::where('department_id', $user->department_id)->latest();
 
-        // Xử lý bộ lọc (Filters)
         if ($request->filled('keyword')) {
-            // Tìm kiếm trên cả Tên khóa học HOẶC Mã yêu cầu
             $query->where(function($q) use ($request) {
                 $q->where('course_name', 'like', '%' . $request->keyword . '%')
                   ->orWhere('code', 'like', '%' . $request->keyword . '%');
@@ -42,7 +41,6 @@ class TrainingRequestController extends Controller
         ]);
     }
 
-    // 2. Màn hình Gửi YC mới
     public function create(Request $request)
     {
         return Inertia::render('DepartmentAdmin/Requests/Create', [
@@ -51,7 +49,6 @@ class TrainingRequestController extends Controller
         ]);
     }
 
-    // 3. Xử lý lưu YC (Lưu nháp hoặc Gửi duyệt)
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -67,7 +64,7 @@ class TrainingRequestController extends Controller
         $count = TrainingRequest::whereYear('created_at', $year)->count() + 1;
         $code = 'YC-' . $year . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
 
-        TrainingRequest::create([
+        $trainingRequest = TrainingRequest::create([
             'code' => $code,
             'department_id' => $request->user()->department_id,
             'requester_id' => $request->user()->id,
@@ -79,11 +76,22 @@ class TrainingRequestController extends Controller
             'status' => $validated['action']
         ]);
 
+        // 👉 BẮN THÔNG BÁO CHO ADMIN HỆ THỐNG
+        if ($validated['action'] === 'pending') {
+            $systemAdmins = User::where('role', 1)->get();
+            foreach ($systemAdmins as $admin) {
+                $admin->notify(new SystemNotification(
+                    'Yêu cầu đào tạo mới',
+                    'Phòng ban <strong>' . ($request->user()->department->name ?? 'N/A') . '</strong> vừa gửi một yêu cầu đào tạo khóa học <strong>' . $validated['course_name'] . '</strong>.',
+                    route('system.requests.show', $trainingRequest->id)
+                ));
+            }
+        }
+
         $message = $validated['action'] === 'draft' ? 'Đã lưu bản nháp!' : 'Đã gửi yêu cầu đào tạo thành công!';
         return redirect()->route('department.requests.index')->with('success', $message);
     }
 
-    // 4. Màn hình Xem chi tiết
     public function show(Request $request, TrainingRequest $trainingRequest)
     {
         if ($trainingRequest->department_id !== $request->user()->department_id) {
@@ -97,7 +105,6 @@ class TrainingRequestController extends Controller
         ]);
     }
 
-    // 5. Cập nhật YC (Chỉ cho phép khi đang là Nháp)
     public function update(Request $request, TrainingRequest $trainingRequest)
     {
         if ($trainingRequest->status !== 'draft') {
@@ -121,6 +128,18 @@ class TrainingRequestController extends Controller
             'notes' => $validated['notes'],
             'status' => $validated['action']
         ]);
+
+        // 👉 BẮN THÔNG BÁO NẾU CHUYỂN TỪ NHÁP SANG GỬI DUYỆT
+        if ($validated['action'] === 'pending') {
+            $systemAdmins = User::where('role', 1)->get();
+            foreach ($systemAdmins as $admin) {
+                $admin->notify(new SystemNotification(
+                    'Yêu cầu đào tạo mới',
+                    'Phòng ban <strong>' . ($request->user()->department->name ?? 'N/A') . '</strong> vừa gửi yêu cầu đào tạo: <strong>' . $validated['course_name'] . '</strong>.',
+                    route('system.requests.show', $trainingRequest->id)
+                ));
+            }
+        }
 
         $message = $validated['action'] === 'draft' ? 'Đã cập nhật bản nháp!' : 'Đã gửi yêu cầu thành công!';
         return redirect()->route('department.requests.index')->with('success', $message);
