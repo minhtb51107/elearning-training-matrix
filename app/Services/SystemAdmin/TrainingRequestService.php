@@ -5,14 +5,16 @@ namespace App\Services\SystemAdmin;
 use App\Models\TrainingRequest;
 use App\Models\User;
 use App\Notifications\SystemNotification;
+use App\Enums\RequestStatusEnum;
 use Illuminate\Support\Facades\DB;
 
 class TrainingRequestService
 {
     public function getFilteredRequests(array $filters)
     {
+        // 👉 Enum
         $query = TrainingRequest::with(['department', 'requester'])
-            ->where('status', '!=', 'draft')
+            ->where('status', '!=', RequestStatusEnum::DRAFT->value)
             ->latest();
 
         if (!empty($filters['tab']) && $filters['tab'] !== 'all') {
@@ -38,8 +40,10 @@ class TrainingRequestService
 
         $requester = User::find($trainingRequest->requester_id);
         if ($requester) {
-            // Nối chuỗi bằng dấu nháy đơn để bọc an toàn HTML class
-            $statusText = $data['status'] === 'approved' ? '<span class="text-green-600">chấp thuận</span>' : '<span class="text-red-600">từ chối</span>';
+            // 👉 Enum
+            $statusText = $data['status'] === RequestStatusEnum::APPROVED->value 
+                        ? '<span class="text-green-600">chấp thuận</span>' 
+                        : '<span class="text-red-600">từ chối</span>';
             $requester->notify(new SystemNotification(
                 'Kết quả Yêu cầu Đào tạo',
                 'Yêu cầu khóa học <strong>' . $trainingRequest->course_name . '</strong> của bạn đã bị ' . $statusText . '.',
@@ -54,11 +58,11 @@ class TrainingRequestService
             $requests = TrainingRequest::whereIn('id', $ids)->get();
 
             foreach ($requests as $req) {
-                $req->update(['status' => 'approved', 'updated_at' => now()]);
+                // 👉 Enum
+                $req->update(['status' => RequestStatusEnum::APPROVED->value, 'updated_at' => now()]);
 
                 $requester = User::find($req->requester_id);
                 if ($requester) {
-                    // Đã fix: Nối chuỗi bằng dấu nháy đơn (.) thay vì bọc toàn bộ bằng ngoặc kép ("")
                     $requester->notify(new SystemNotification(
                         'Kết quả Yêu cầu Đào tạo',
                         'Yêu cầu khóa học <strong>' . $req->course_name . '</strong> của bạn đã được <span class="text-green-600">chấp thuận</span>.',

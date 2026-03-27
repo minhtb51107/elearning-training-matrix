@@ -120,7 +120,7 @@ class CourseService
             ClassEnrollment::create([
                 'course_class_id' => $classId,
                 'user_id' => $user->id,
-                'status' => 'enrolled'
+                'status' => EnrollmentStatusEnum::ENROLLED->value // 👉 Đã sửa cứng thành Enum
             ]);
 
             $courseClass = CourseClass::find($classId);

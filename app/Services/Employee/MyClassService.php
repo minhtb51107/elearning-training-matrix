@@ -14,7 +14,7 @@ use Carbon\Carbon;
 
 class MyClassService
 {
-    public function getMyClassesList($userId, array $filters)
+public function getMyClassesList($userId, array $filters)
     {
         $query = ClassEnrollment::with(['courseClass.course'])->where('user_id', $userId)->latest();
 
@@ -30,9 +30,11 @@ class MyClassService
 
         if (!empty($filters['status']) && $filters['status'] !== 'Tất cả') {
             if ($filters['status'] === 'Đang học') {
-                $query->whereIn('status', ['enrolled', 'in_progress']);
+                // 👉 Enum
+                $query->whereIn('status', [EnrollmentStatusEnum::ENROLLED->value, EnrollmentStatusEnum::IN_PROGRESS->value]);
             } elseif ($filters['status'] === 'Hoàn thành') {
-                $query->whereIn('status', ['completed', 'failed']);
+                // 👉 Enum
+                $query->whereIn('status', [EnrollmentStatusEnum::COMPLETED->value, EnrollmentStatusEnum::FAILED->value]);
             }
         }
 
@@ -47,11 +49,12 @@ class MyClassService
                 $dateStr = Carbon::parse($cls->start_date)->format('m/Y') . ' - ' . Carbon::parse($cls->end_date)->format('m/Y');
             }
 
+            // 👉 Enum thay thế mảng Map cứng
             $statusMap = [
-                'enrolled' => 'Đã đăng ký - Chưa bắt đầu',
-                'in_progress' => 'Đang học',
-                'completed' => 'Đã hoàn thành',
-                'failed' => 'Chưa đạt'
+                EnrollmentStatusEnum::ENROLLED->value => 'Đã đăng ký - Chưa bắt đầu',
+                EnrollmentStatusEnum::IN_PROGRESS->value => 'Đang học',
+                EnrollmentStatusEnum::COMPLETED->value => 'Đã hoàn thành',
+                EnrollmentStatusEnum::FAILED->value => 'Chưa đạt'
             ];
             
             $progress = $enrollment->progress_percent ?? 0;
@@ -65,8 +68,9 @@ class MyClassService
                 'statusText' => $statusMap[$enrollment->status] ?? 'Chưa xác định',
                 'progress' => $progress,
                 'progressText' => $progress . '%',
-                'isFailed' => $enrollment->status === 'failed',
-                'btn' => in_array($enrollment->status, ['completed', 'failed']) ? 'Xem kết quả' : 'Bắt đầu học'
+                // 👉 Enum
+                'isFailed' => $enrollment->status === EnrollmentStatusEnum::FAILED->value,
+                'btn' => in_array($enrollment->status, [EnrollmentStatusEnum::COMPLETED->value, EnrollmentStatusEnum::FAILED->value]) ? 'Xem kết quả' : 'Bắt đầu học'
             ];
         });
 
@@ -171,8 +175,9 @@ class MyClassService
             ->where('user_id', $userId)
             ->firstOrFail();
 
-        if ($classEnrollment->status === 'enrolled') {
-            $classEnrollment->status = 'in_progress';
+        // 👉 Enum
+        if ($classEnrollment->status === EnrollmentStatusEnum::ENROLLED->value) {
+            $classEnrollment->status = EnrollmentStatusEnum::IN_PROGRESS->value;
         }
 
         $courseClass = CourseClass::findOrFail($courseClassId);

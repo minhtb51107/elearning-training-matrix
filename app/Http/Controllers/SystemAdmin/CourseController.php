@@ -34,7 +34,11 @@ class CourseController extends Controller
     public function create(Request $request)
     {
         return Inertia::render('SystemAdmin/Courses/Create', [
-            'approvedRequests' => TrainingRequest::with('department')->where('status', 'approved')->latest()->get(),
+            // 👉 Sửa 'approved' thành RequestStatusEnum
+            'approvedRequests' => TrainingRequest::with('department')
+                ->where('status', RequestStatusEnum::APPROVED->value)
+                ->latest()
+                ->get(),
             'preselectedRequestId' => $request->query('request_id') 
         ]);
     }

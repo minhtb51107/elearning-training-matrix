@@ -63,7 +63,7 @@ class CourseService
                 $requests = TrainingRequest::whereIn('id', $data['request_ids'])->get();
                 
                 TrainingRequest::whereIn('id', $data['request_ids'])->update([
-                    'status' => 'processed',
+                    'status' => RequestStatusEnum::PROCESSED->value,
                     'course_id' => $course->id,
                     'updated_at' => now()
                 ]);

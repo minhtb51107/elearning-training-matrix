@@ -15,8 +15,8 @@ class ReportService
         $totalClasses = CourseClass::count();
         $totalEnrollments = ClassEnrollment::count();
 
-        $completedCount = ClassEnrollment::where('status', 'completed')->count();
-        $failedCount = ClassEnrollment::where('status', 'failed')->count();
+        $completedCount = ClassEnrollment::where('status', EnrollmentStatusEnum::COMPLETED->value)->count();
+        $failedCount = ClassEnrollment::where('status', EnrollmentStatusEnum::FAILED->value)->count();
         
         $completedPercent = $totalEnrollments > 0 ? round(($completedCount / $totalEnrollments) * 100) : 0;
         $failedPercent = $totalEnrollments > 0 ? round(($failedCount / $totalEnrollments) * 100) : 0;

@@ -17,7 +17,7 @@ class StoreTrainingRequest extends FormRequest
     /**
      * Các luật kiểm tra dữ liệu đầu vào.
      */
-    public function rules()
+public function rules()
     {
         return [
             'course_name' => 'required|string|max:255',
@@ -25,7 +25,8 @@ class StoreTrainingRequest extends FormRequest
             'content' => 'required|string',
             'expected_duration' => 'required|integer|min:1',
             'notes' => 'nullable|string',
-            'action' => 'required|in:draft,pending'
+            // 👉 Thay 'in:draft,pending' bằng Rule::in với Enum
+            'action' => ['required', Rule::in([RequestStatusEnum::DRAFT->value, RequestStatusEnum::PENDING->value])]
         ];
     }
 

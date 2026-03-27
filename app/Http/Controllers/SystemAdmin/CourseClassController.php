@@ -96,7 +96,8 @@ class CourseClassController extends Controller
             'courseClass' => $courseClass,
             'courses' => Course::where('status', '!=', 'Đã kết thúc')->get(),
             'departments' => Department::all(),
-            'instructors' => \App\Models\User::where('role', '!=', 3)->get()
+            // 👉 Sửa 'role', 3 thành RoleEnum
+            'instructors' => \App\Models\User::where('role', '!=', RoleEnum::EMPLOYEE->value)->get()
         ]);
     }
 

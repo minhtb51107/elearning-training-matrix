@@ -5,6 +5,7 @@ namespace App\Services\DepartmentAdmin;
 use App\Models\TrainingRequest;
 use App\Models\User;
 use App\Notifications\SystemNotification;
+use App\Enums\RequestStatusEnum;
 
 class TrainingRequestService
 {
@@ -46,10 +47,11 @@ class TrainingRequestService
             'content' => $data['content'],
             'expected_duration' => $data['expected_duration'],
             'notes' => $data['notes'],
-            'status' => $data['action']
+            'status' => $data['action'] // Nhận thẳng từ form request (đã validate Enum)
         ]);
 
-        if ($data['action'] === 'pending') {
+        // 👉 Dùng Enum
+        if ($data['action'] === RequestStatusEnum::PENDING->value) {
             $this->notifySystemAdmins($user, $trainingRequest);
         }
 
@@ -67,7 +69,8 @@ class TrainingRequestService
             'status' => $data['action']
         ]);
 
-        if ($data['action'] === 'pending') {
+        // 👉 Dùng Enum
+        if ($data['action'] === RequestStatusEnum::PENDING->value) {
             $this->notifySystemAdmins($user, $trainingRequest);
         }
 
@@ -77,7 +80,8 @@ class TrainingRequestService
     private function notifySystemAdmins($user, $trainingRequest)
     {
         $departmentName = $user->department->name ?? 'N/A';
-        $systemAdmins = User::where('role', 1)->get();
+        // 👉 Đổi số 1 thành RoleEnum::SYSTEM_ADMIN->value
+        $systemAdmins = User::where('role', \App\Enums\RoleEnum::SYSTEM_ADMIN->value)->get();
         
         foreach ($systemAdmins as $admin) {
             $admin->notify(new SystemNotification(

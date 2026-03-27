@@ -88,7 +88,9 @@ class GradeService
                     ->first();
 
                 if ($enrollment) {
-                    $enrollment->update(['status' => $isPassed ? 'completed' : 'failed']);
+                    // 👉 Đã đổi chuỗi trạng thái đỗ/trượt thành Enum
+                    $newStatus = $isPassed ? EnrollmentStatusEnum::COMPLETED->value : EnrollmentStatusEnum::FAILED->value;
+                    $enrollment->update(['status' => $newStatus]);
                 }
             }
 

@@ -3,6 +3,7 @@
 namespace App\Services\Employee;
 
 use App\Models\ClassEnrollment;
+use App\Enums\EnrollmentStatusEnum;
 
 class ResultService
 {
@@ -18,7 +19,8 @@ class ResultService
             ])
             ->where('user_id', $userId)
             ->where(function($q) use ($userId) {
-                $q->whereIn('status', ['completed', 'failed'])
+                // 👉 Enum
+                $q->whereIn('status', [EnrollmentStatusEnum::COMPLETED->value, EnrollmentStatusEnum::FAILED->value])
                   ->orWhereHas('courseClass.course.assignments.submissions', function($subQ) use ($userId) {
                       $subQ->where('user_id', $userId)->where('status', 'pending');
                   });
@@ -30,12 +32,13 @@ class ResultService
         }
 
         if (!empty($filters['status']) && $filters['status'] !== 'Tất cả') {
+            // 👉 Enum
             if ($filters['status'] === 'Đạt') {
-                $query->where('status', 'completed');
+                $query->where('status', EnrollmentStatusEnum::COMPLETED->value);
             } elseif ($filters['status'] === 'Không đạt') {
-                $query->where('status', 'failed');
+                $query->where('status', EnrollmentStatusEnum::FAILED->value);
             } elseif ($filters['status'] === 'Chờ chấm') {
-                $query->where('status', 'in_progress'); 
+                $query->where('status', EnrollmentStatusEnum::IN_PROGRESS->value); 
             }
         }
 
@@ -63,12 +66,13 @@ class ResultService
             $cert = '--';
             $actionText = '[Xem]';
 
-            if ($enrollment->status === 'completed') {
+            // 👉 Enum
+            if ($enrollment->status === EnrollmentStatusEnum::COMPLETED->value) {
                 $status = 'ĐẠT';
                 $score = $submission ? $submission->score : '--';
                 $cert = 'Sẵn sàng';
                 $actionText = '[Tải]';
-            } elseif ($enrollment->status === 'failed') {
+            } elseif ($enrollment->status === EnrollmentStatusEnum::FAILED->value) {
                 $status = 'KHÔNG ĐẠT';
                 $score = $submission ? $submission->score : '--';
                 $cert = 'Không cấp';
