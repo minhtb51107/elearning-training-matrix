@@ -3,6 +3,7 @@ namespace App\Http\Controllers\Employee;
 
 use App\Http\Controllers\Controller;
 use App\Services\Employee\CourseService;
+use App\Http\Resources\EmployeeCourseResource; // 👉 Import Resource của bạn
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -19,10 +20,10 @@ class CourseController extends Controller
     public function index(Request $request)
     {
         $filters = $request->only(['keyword', 'type']);
-        $courses = $this->courseService->getAvailableCourses(Auth::user(), $filters);
+        $coursesRaw = $this->courseService->getAvailableCourses(Auth::user(), $filters);
 
         return Inertia::render('Employee/Courses/Index', [
-            'courses' => $courses,
+            'courses' => EmployeeCourseResource::collection($coursesRaw), // 👉 Bọc Resource ở đây
             'filters' => $filters
         ]);
     }

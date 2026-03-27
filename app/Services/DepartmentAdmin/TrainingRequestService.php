@@ -6,6 +6,7 @@ use App\Models\TrainingRequest;
 use App\Models\User;
 use App\Notifications\SystemNotification;
 use App\Enums\RequestStatusEnum;
+use App\Events\TrainingRequestSubmitted;
 
 class TrainingRequestService
 {
@@ -32,7 +33,7 @@ class TrainingRequestService
         return $query->paginate(10)->withQueryString();
     }
 
-    public function createRequest(array $data, $user)
+public function createRequest(array $data, $user)
     {
         $year = date('Y');
         $count = TrainingRequest::whereYear('created_at', $year)->count() + 1;
@@ -47,12 +48,12 @@ class TrainingRequestService
             'content' => $data['content'],
             'expected_duration' => $data['expected_duration'],
             'notes' => $data['notes'],
-            'status' => $data['action'] // Nhận thẳng từ form request (đã validate Enum)
+            'status' => $data['action'] 
         ]);
 
-        // 👉 Dùng Enum
         if ($data['action'] === RequestStatusEnum::PENDING->value) {
-            $this->notifySystemAdmins($user, $trainingRequest);
+            // 👉 Bắn sự kiện (Fire Event)
+            event(new TrainingRequestSubmitted($trainingRequest, $user));
         }
 
         return $trainingRequest;
@@ -69,9 +70,9 @@ class TrainingRequestService
             'status' => $data['action']
         ]);
 
-        // 👉 Dùng Enum
         if ($data['action'] === RequestStatusEnum::PENDING->value) {
-            $this->notifySystemAdmins($user, $trainingRequest);
+            // 👉 Bắn sự kiện (Fire Event)
+            event(new TrainingRequestSubmitted($trainingRequest, $user));
         }
 
         return $trainingRequest;

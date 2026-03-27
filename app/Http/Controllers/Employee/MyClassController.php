@@ -3,8 +3,9 @@ namespace App\Http\Controllers\Employee;
 
 use App\Http\Controllers\Controller;
 use App\Services\Employee\MyClassService;
-use App\Http\Requests\Employee\CompleteLessonRequest; // 👉 Import Request
-use App\Http\Requests\Employee\SubmitAssignmentRequest; // 👉 Import Request
+use App\Http\Requests\Employee\CompleteLessonRequest;
+use App\Http\Requests\Employee\SubmitAssignmentRequest;
+use App\Http\Resources\MyClassResource; // 👉 Import Resource của bạn
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -21,10 +22,10 @@ class MyClassController extends Controller
     public function index(Request $request)
     {
         $filters = $request->only(['keyword', 'status']);
-        $classes = $this->myClassService->getMyClassesList(Auth::id(), $filters);
+        $classesRaw = $this->myClassService->getMyClassesList(Auth::id(), $filters);
 
         return Inertia::render('Employee/MyClasses/Index', [
-            'classes' => $classes,
+            'classes' => MyClassResource::collection($classesRaw), // 👉 Bọc Resource ở đây
             'filters' => $filters
         ]);
     }
@@ -35,7 +36,6 @@ class MyClassController extends Controller
         return Inertia::render('Employee/MyClasses/Show', $data);
     }
 
-    // 👉 Thay đổi Request thành CompleteLessonRequest
     public function completeLesson(CompleteLessonRequest $request, $courseClassId)
     {
         $validated = $request->validated();
@@ -49,7 +49,6 @@ class MyClassController extends Controller
         ]);
     }
 
-    // 👉 Thay đổi Request thành SubmitAssignmentRequest
     public function submitAssignment(SubmitAssignmentRequest $request, $courseClassId)
     {
         $this->myClassService->processAssignmentSubmission(

@@ -3,6 +3,7 @@ namespace App\Http\Controllers\Employee;
 
 use App\Http\Controllers\Controller;
 use App\Services\Employee\MyScheduleService;
+use App\Http\Resources\MyScheduleResource; // 👉 Import Resource của bạn
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -19,10 +20,10 @@ class MyScheduleController extends Controller
     public function index(Request $request)
     {
         $filters = $request->only(['filter_time']);
-        $schedule = $this->scheduleService->getSchedule(Auth::id(), $filters);
+        $scheduleRaw = $this->scheduleService->getSchedule(Auth::id(), $filters);
 
         return Inertia::render('Employee/MySchedule/Index', [
-            'schedule' => $schedule,
+            'schedule' => MyScheduleResource::collection($scheduleRaw), // 👉 Bọc Resource ở đây
             'filters' => $filters
         ]);
     }

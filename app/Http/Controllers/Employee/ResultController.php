@@ -3,6 +3,7 @@ namespace App\Http\Controllers\Employee;
 
 use App\Http\Controllers\Controller;
 use App\Services\Employee\ResultService;
+use App\Http\Resources\ResultResource; // 👉 Import Resource của bạn
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -19,10 +20,10 @@ class ResultController extends Controller
     public function index(Request $request)
     {
         $filters = $request->only(['year', 'status', 'keyword']);
-        $results = $this->resultService->getMyResults(Auth::id(), $filters);
+        $resultsRaw = $this->resultService->getMyResults(Auth::id(), $filters);
 
         return Inertia::render('Employee/Results/Index', [
-            'results' => $results,
+            'results' => ResultResource::collection($resultsRaw), // 👉 Bọc Resource ở đây
             'filters' => $filters
         ]);
     }
