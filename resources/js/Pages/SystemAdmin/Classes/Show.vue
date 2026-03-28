@@ -11,7 +11,8 @@ import {
     XMarkIcon, 
     UserPlusIcon, 
     ArrowUpTrayIcon,
-    MagnifyingGlassIcon
+    MagnifyingGlassIcon,
+    DocumentArrowDownIcon // Icon mới cho Export
 } from '@heroicons/vue/20/solid';
 
 const props = defineProps({
@@ -68,7 +69,7 @@ const students = computed(() => {
 });
 
 // ==========================================
-// LOGIC MODAL THÊM HỌC VIÊN + TÌM KIẾM XỊN
+// LOGIC MODAL THÊM HỌC VIÊN + TÌM KIẾM
 // ==========================================
 const showAddStudentModal = ref(false);
 const selectedUserIds = ref([]);
@@ -162,6 +163,34 @@ const deleteDoc = (doc) => {
         router.delete(route('system.classes.delete-document', doc.id), { preserveScroll: true });
     }
 };
+
+// ==========================================
+// LOGIC IMPORT/EXPORT EXCEL CHẤM ĐIỂM
+// ==========================================
+
+const showImportGradesModal = ref(false);
+const importForm = useForm({
+    excel_file: null,
+});
+
+const handleExportTemplate = () => {
+    // Gọi route xuất file Excel (bạn cần tạo route này trong backend Laravel)
+    window.location.href = route('system.classes.export-grades', props.courseClass.id);
+};
+
+const submitImportGrades = () => {
+    if (!importForm.excel_file) return alert('Vui lòng chọn file Excel kết quả chấm điểm!');
+
+    importForm.post(route('system.classes.import-grades', props.courseClass.id), {
+        onSuccess: () => {
+            showImportGradesModal.value = false;
+            importForm.reset();
+            alert('Cập nhật điểm thành công!'); // Có thể thay bằng flash message
+        },
+        preserveScroll: true
+    });
+};
+
 </script>
 
 <template>
@@ -340,9 +369,17 @@ const deleteDoc = (doc) => {
                         <div v-if="activeTab === 'Kết quả'">
                             <div class="flex justify-between items-center mb-4">
                                 <h3 class="text-base font-bold text-gray-800">Kết quả Học tập & Điểm số</h3>
-                                <Link :href="route('system.grades.index')" class="text-sm text-blue-600 hover:underline font-semibold bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100">
-                                    Mở Trung tâm Chấm điểm &rarr;
-                                </Link>
+                                <div class="flex gap-3">
+                                    <a :href="route('system.classes.export-grades', props.courseClass.id)" class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 shadow-sm transition-colors">
+    <DocumentArrowDownIcon class="w-4 h-4 text-green-600" /> Xuất DS chấm điểm (Excel)
+</a>
+                                    <button @click="showImportGradesModal = true" class="inline-flex items-center gap-2 px-4 py-2 bg-green-600 border border-transparent rounded-lg text-sm font-semibold text-white hover:bg-green-700 shadow-sm transition-colors">
+                                        <ArrowUpTrayIcon class="w-4 h-4" /> Import Điểm Excel
+                                    </button>
+                                    <Link :href="route('system.grades.index')" class="text-sm text-blue-600 hover:underline font-semibold bg-blue-50 px-4 py-2 rounded-lg border border-blue-100 flex items-center">
+                                        Trung tâm Chấm điểm &rarr;
+                                    </Link>
+                                </div>
                             </div>
                             
                             <div class="overflow-x-auto border border-gray-200 rounded-lg">
@@ -504,6 +541,50 @@ const deleteDoc = (doc) => {
                         <button type="submit" :disabled="docForm.processing" class="inline-flex items-center gap-2 px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-sm shadow-blue-600/30 transition-colors disabled:opacity-50">
                             <span v-if="docForm.processing" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
                             {{ docForm.processing ? 'Đang xử lý...' : 'Xác nhận tải lên' }}
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </Modal>
+
+        <Modal :show="showImportGradesModal" @close="showImportGradesModal = false" maxWidth="md">
+            <form @submit.prevent="submitImportGrades" class="bg-white rounded-xl overflow-hidden shadow-2xl">
+                <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                    <h3 class="text-lg font-bold text-gray-900">Import điểm từ Excel</h3>
+                    <button type="button" @click="showImportGradesModal = false" class="text-gray-400 hover:text-gray-600 transition-colors"><XMarkIcon class="w-6 h-6" /></button>
+                </div>
+                
+                <div class="p-6">
+                    <div class="mb-6 bg-blue-50 border border-blue-100 rounded-lg p-4 text-sm text-blue-800">
+                        <p class="font-bold mb-1">Hướng dẫn:</p>
+                        <ol class="list-decimal ml-5 space-y-1">
+                            <li>Xuất danh sách chấm điểm (File Excel).</li>
+                            <li>Giảng viên điền điểm và lời phê vào file.</li>
+                            <li>Upload file đã điền vào đây để hệ thống tự động cập nhật.</li>
+                        </ol>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Chọn File Excel đã chấm điểm <span class="text-red-500">*</span></label>
+                        <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors relative cursor-pointer">
+                            <input type="file" accept=".xlsx, .xls" @input="importForm.excel_file = $event.target.files[0]" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                            <div class="space-y-1 text-center">
+                                <ArrowUpTrayIcon class="mx-auto h-8 w-8 text-green-500" />
+                                <div class="flex text-sm text-gray-600 justify-center">
+                                    <span class="font-medium text-green-600 hover:text-green-500 focus-within:outline-none">Tải file Excel lên</span>
+                                    <p class="pl-1">hoặc kéo thả vào đây</p>
+                                </div>
+                                <p class="text-xs text-gray-500">{{ importForm.excel_file ? importForm.excel_file.name : 'Chỉ hỗ trợ file .xlsx, .xls' }}</p>
+                            </div>
+                        </div>
+                        <div v-if="importForm.errors.excel_file" class="text-red-600 text-xs font-medium mt-1">{{ importForm.errors.excel_file }}</div>
+                    </div>
+
+                    <div class="flex justify-end gap-3 mt-8">
+                        <button type="button" @click="showImportGradesModal = false" class="px-5 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">Hủy</button>
+                        <button type="submit" :disabled="importForm.processing" class="inline-flex items-center gap-2 px-5 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 shadow-sm shadow-green-600/30 transition-colors disabled:opacity-50">
+                            <span v-if="importForm.processing" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+                            {{ importForm.processing ? 'Đang xử lý...' : 'Cập nhật điểm' }}
                         </button>
                     </div>
                 </div>

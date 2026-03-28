@@ -35,9 +35,10 @@ const activeAssignment = computed(() => {
     return props.assignments.find(a => a.id === activeId.value) || null;
 });
 
+// ĐÃ SỬA: Lấy đúng assignment_id ngay lúc khởi tạo thay vì để rỗng
 const submissionForm = useForm({
-    assignment_id: '',
-    answers: [], // Đổi sang mảng để hứng đáp án tự luận
+    assignment_id: activeType.value === 'assignment' ? activeId.value : '',
+    answers: [], 
     file: null,
 });
 
@@ -108,7 +109,11 @@ onMounted(() => {
 const submitAssignment = () => {
     submissionForm.post(route('employee.submissions.store', props.classInfo.id), {
         preserveScroll: true,
-        onSuccess: () => submissionForm.reset('answers', 'file')
+        onSuccess: () => {
+            submissionForm.reset('answers', 'file');
+            // Load lại cục props để cập nhật trạng thái UI
+            router.reload({ only: ['assignments'] });
+        }
     });
 };
 </script>
@@ -117,7 +122,6 @@ const submitAssignment = () => {
     <Head :title="course.name + ' - Đang học'" />
 
     <AuthenticatedLayout>
-        
         <template #header>
             <div class="flex items-center">
                 <Link :href="route('employee.my-classes')" class="flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-blue-600 transition-colors">
@@ -130,6 +134,14 @@ const submitAssignment = () => {
         <div class="py-6">
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
                 
+                <div v-if="$page.props.flash?.success" class="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg shadow-sm font-bold flex items-center gap-2">
+                    <CheckCircleIcon class="w-5 h-5" />
+                    {{ $page.props.flash.success }}
+                </div>
+                <div v-if="$page.props.flash?.error" class="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg shadow-sm font-bold">
+                    {{ $page.props.flash.error }}
+                </div>
+
                 <div class="flex flex-col lg:flex-row gap-6">
                     
                     <div class="flex-1 flex flex-col gap-6">
@@ -267,11 +279,16 @@ const submitAssignment = () => {
 
                             <div v-else>
                                 <h3 class="text-sm font-bold text-gray-900 mb-4 border-t border-gray-100 pt-6">Nộp bài làm của bạn</h3>
+                                
+                                <div v-if="submissionForm.errors.assignment_id" class="text-red-600 text-sm mb-3 font-bold bg-red-50 p-2 rounded">{{ submissionForm.errors.assignment_id }}</div>
+                                <div v-if="submissionForm.errors.answers" class="text-red-600 text-sm mb-3 font-bold bg-red-50 p-2 rounded">{{ submissionForm.errors.answers }}</div>
+                                <div v-if="submissionForm.errors.file" class="text-red-600 text-sm mb-3 font-bold bg-red-50 p-2 rounded">{{ submissionForm.errors.file }}</div>
+
                                 <form @submit.prevent="submitAssignment">
                                     <div class="mb-5 space-y-6">
                                         <div v-for="(question, qIndex) in activeAssignment.questions" :key="qIndex">
                                             <label class="block text-sm font-bold text-gray-800 mb-2">Câu {{ qIndex + 1 }}: <span class="font-normal text-gray-600">{{ question }} <span class="text-red-500">*</span></span></label>
-                                            <textarea v-model="submissionForm.answers[qIndex]" rows="3" required class="w-full border-gray-300 rounded-lg text-sm focus:ring-indigo-500 focus:border-indigo-500 shadow-sm transition-colors" placeholder="Nhập câu trả lời của bạn tại đây..."></textarea>
+                                            <textarea v-model="submissionForm.answers[qIndex]" required rows="3" class="w-full border-gray-300 rounded-lg text-sm focus:ring-indigo-500 focus:border-indigo-500 shadow-sm transition-colors" placeholder="Nhập câu trả lời của bạn tại đây..."></textarea>
                                         </div>
                                     </div>
 

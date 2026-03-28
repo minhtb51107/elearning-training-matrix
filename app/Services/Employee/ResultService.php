@@ -19,7 +19,6 @@ class ResultService
             ])
             ->where('user_id', $userId)
             ->where(function($q) use ($userId) {
-                // 👉 Enum
                 $q->whereIn('status', [EnrollmentStatusEnum::COMPLETED->value, EnrollmentStatusEnum::FAILED->value])
                   ->orWhereHas('courseClass.course.assignments.submissions', function($subQ) use ($userId) {
                       $subQ->where('user_id', $userId)->where('status', 'pending');
@@ -32,7 +31,6 @@ class ResultService
         }
 
         if (!empty($filters['status']) && $filters['status'] !== 'Tất cả') {
-            // 👉 Enum
             if ($filters['status'] === 'Đạt') {
                 $query->where('status', EnrollmentStatusEnum::COMPLETED->value);
             } elseif ($filters['status'] === 'Không đạt') {
@@ -52,48 +50,6 @@ class ResultService
             });
         }
 
-        $paginator = $query->paginate(10)->withQueryString();
-
-        $paginator->getCollection()->transform(function ($enrollment) {
-            $courseClass = $enrollment->courseClass;
-            $course = $courseClass->course;
-            
-            $finalAssignment = $course ? $course->assignments->where('type', 'final')->first() : null;
-            $submission = $finalAssignment ? $finalAssignment->submissions->first() : null;
-
-            $score = '--';
-            $status = 'ĐANG HỌC';
-            $cert = '--';
-            $actionText = '[Xem]';
-
-            // 👉 Enum
-            if ($enrollment->status === EnrollmentStatusEnum::COMPLETED->value) {
-                $status = 'ĐẠT';
-                $score = $submission ? $submission->score : '--';
-                $cert = 'Sẵn sàng';
-                $actionText = '[Tải]';
-            } elseif ($enrollment->status === EnrollmentStatusEnum::FAILED->value) {
-                $status = 'KHÔNG ĐẠT';
-                $score = $submission ? $submission->score : '--';
-                $cert = 'Không cấp';
-                $actionText = '[Xem]';
-            } elseif ($submission && $submission->status === 'pending') {
-                $status = 'CHỜ CHẤM';
-                $actionText = '[Xem]';
-            }
-
-            return [
-                'id' => $enrollment->id,
-                'course' => $course ? $course->name : '--',
-                'class' => $courseClass->code,
-                'date' => $enrollment->updated_at->format('d/m/Y'),
-                'score' => $score,
-                'status' => $status,
-                'cert' => $cert,
-                'actionText' => $actionText,
-            ];
-        });
-
-        return $paginator;
+        return $query->paginate(10)->withQueryString();
     }
 }

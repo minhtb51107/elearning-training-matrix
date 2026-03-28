@@ -6,6 +6,7 @@ use App\Models\Course;
 use App\Models\CourseClass;
 use App\Models\ClassEnrollment;
 use App\Models\Department;
+use App\Enums\EnrollmentStatusEnum;
 
 class ReportService
 {

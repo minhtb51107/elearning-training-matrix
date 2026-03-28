@@ -8,13 +8,14 @@ use App\Models\LessonCompletion;
 use App\Models\CourseLesson;
 use App\Models\Submission;
 use App\Models\User;
+use App\Enums\EnrollmentStatusEnum;
 use App\Notifications\SystemNotification;
 use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 
 class MyClassService
 {
-public function getMyClassesList($userId, array $filters)
+    public function getMyClassesList($userId, array $filters)
     {
         $query = ClassEnrollment::with(['courseClass.course'])->where('user_id', $userId)->latest();
 
@@ -30,51 +31,13 @@ public function getMyClassesList($userId, array $filters)
 
         if (!empty($filters['status']) && $filters['status'] !== 'Tất cả') {
             if ($filters['status'] === 'Đang học') {
-                // 👉 Enum
                 $query->whereIn('status', [EnrollmentStatusEnum::ENROLLED->value, EnrollmentStatusEnum::IN_PROGRESS->value]);
             } elseif ($filters['status'] === 'Hoàn thành') {
-                // 👉 Enum
                 $query->whereIn('status', [EnrollmentStatusEnum::COMPLETED->value, EnrollmentStatusEnum::FAILED->value]);
             }
         }
 
-        $paginator = $query->paginate(6)->withQueryString();
-
-        $paginator->getCollection()->transform(function ($enrollment) {
-            $cls = $enrollment->courseClass;
-            $course = $cls->course;
-            
-            $dateStr = 'Chưa xác định';
-            if ($cls->start_date && $cls->end_date) {
-                $dateStr = Carbon::parse($cls->start_date)->format('m/Y') . ' - ' . Carbon::parse($cls->end_date)->format('m/Y');
-            }
-
-            // 👉 Enum thay thế mảng Map cứng
-            $statusMap = [
-                EnrollmentStatusEnum::ENROLLED->value => 'Đã đăng ký - Chưa bắt đầu',
-                EnrollmentStatusEnum::IN_PROGRESS->value => 'Đang học',
-                EnrollmentStatusEnum::COMPLETED->value => 'Đã hoàn thành',
-                EnrollmentStatusEnum::FAILED->value => 'Chưa đạt'
-            ];
-            
-            $progress = $enrollment->progress_percent ?? 0;
-
-            return [
-                'id' => $cls->id,
-                'title' => $cls->code,
-                'course_name' => $course ? $course->name : '--',
-                'description' => $cls->name,
-                'date' => $dateStr,
-                'statusText' => $statusMap[$enrollment->status] ?? 'Chưa xác định',
-                'progress' => $progress,
-                'progressText' => $progress . '%',
-                // 👉 Enum
-                'isFailed' => $enrollment->status === EnrollmentStatusEnum::FAILED->value,
-                'btn' => in_array($enrollment->status, [EnrollmentStatusEnum::COMPLETED->value, EnrollmentStatusEnum::FAILED->value]) ? 'Xem kết quả' : 'Bắt đầu học'
-            ];
-        });
-
-        return $paginator;
+        return $query->paginate(6)->withQueryString();
     }
 
     public function getClassDetail($classId, $userId)
@@ -175,7 +138,6 @@ public function getMyClassesList($userId, array $filters)
             ->where('user_id', $userId)
             ->firstOrFail();
 
-        // 👉 Enum
         if ($classEnrollment->status === EnrollmentStatusEnum::ENROLLED->value) {
             $classEnrollment->status = EnrollmentStatusEnum::IN_PROGRESS->value;
         }

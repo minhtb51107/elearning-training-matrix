@@ -10,15 +10,15 @@ class Course extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'code',
-        'name',
-        'target_audience',
-        'format',
-        'duration',
-        'content',
-        'description',
-        'reason',
-        'status'
+        'code', 
+        'name', 
+        'target_audience', 
+        'format', 
+        'duration', 
+        'description', 
+        'reason', 
+        'status',
+        'content'     // Thêm dòng này để phòng hờ bị lỗi tương tự với content
     ];
 
     // Khóa học có thể chứa nhiều yêu cầu đào tạo

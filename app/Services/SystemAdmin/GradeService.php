@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Notifications\SystemNotification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
+use App\Enums\EnrollmentStatusEnum; // Tuỳ thuộc vào thư mục bạn đang lưu Enum
 
 class GradeService
 {

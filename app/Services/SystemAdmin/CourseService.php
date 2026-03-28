@@ -56,7 +56,7 @@ class CourseService
             $data['code'] = 'KH-' . date('Y') . '-' . str_pad($nextId, 4, '0', STR_PAD_LEFT);
             $data['status'] = 'Chưa có lớp';
 
-            $course = Course::create(collect($data)->except(['request_ids', 'lessons', 'assignments', 'documents'])->toArray());
+            $course = Course::create(collect($data)->except(['request_ids', 'lessons', 'assignments', 'documents', 'instructor', 'notes'])->toArray());
 
             // Gắn kết Request từ Phòng ban
             if (!empty($data['request_ids'])) {
@@ -142,7 +142,7 @@ class CourseService
     public function updateCourse(Course $course, array $data)
     {
         DB::transaction(function () use ($course, $data) {
-            $course->update(collect($data)->except(['deleted_lesson_ids', 'lessons', 'deleted_assignment_ids', 'assignments', 'new_documents', 'deleted_document_ids'])->toArray());
+            $course->update(collect($data)->except(['deleted_lesson_ids', 'lessons', 'deleted_assignment_ids', 'assignments', 'new_documents', 'deleted_document_ids', 'instructor', 'notes'])->toArray());
 
             // Cập nhật Bài giảng
             if (!empty($data['deleted_lesson_ids'])) {

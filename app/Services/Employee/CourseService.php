@@ -5,6 +5,7 @@ namespace App\Services\Employee;
 use App\Models\Course;
 use App\Models\CourseClass;
 use App\Models\ClassEnrollment;
+use App\Enums\EnrollmentStatusEnum;
 use App\Notifications\SystemNotification;
 use Illuminate\Support\Facades\Storage;
 
@@ -31,20 +32,7 @@ class CourseService
             }
         }
 
-        $paginator = $query->paginate(6)->withQueryString();
-
-        $paginator->getCollection()->transform(function ($course) {
-            return [
-                'id' => $course->id,
-                'image' => 'https://placehold.co/600x300/0ea5e9/white?text=' . urlencode(mb_strtoupper(mb_substr($course->name, 0, 3, 'UTF-8'))),
-                'title' => $course->name,
-                'description' => $course->description ?: 'Chưa có mô tả',
-                'date' => $course->created_at->format('m/Y'),
-                'type' => $course->target_audience === 'Toàn phòng' ? 'Bắt buộc' : 'Tự chọn'
-            ];
-        });
-
-        return $paginator;
+        return $query->paginate(6)->withQueryString();
     }
 
     public function getCourseDetails($id, $userId)
@@ -120,7 +108,7 @@ class CourseService
             ClassEnrollment::create([
                 'course_class_id' => $classId,
                 'user_id' => $user->id,
-                'status' => EnrollmentStatusEnum::ENROLLED->value // 👉 Đã sửa cứng thành Enum
+                'status' => EnrollmentStatusEnum::ENROLLED->value
             ]);
 
             $courseClass = CourseClass::find($classId);

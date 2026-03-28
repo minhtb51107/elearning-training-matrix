@@ -13,6 +13,8 @@ use App\Http\Requests\SystemAdmin\ClassStatusRequest;
 use App\Http\Requests\SystemAdmin\UploadDocumentRequest;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use App\Exports\GradeExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class CourseClassController extends Controller
 {
@@ -112,5 +114,27 @@ class CourseClassController extends Controller
     {
         $courseClass->delete();
         return redirect()->route('system.classes.index')->with('success', 'Đã xóa lớp học!');
+    }
+
+    /**
+     * Xuất file Excel danh sách bài nộp của Lớp
+     */
+    public function exportGrades($id)
+    {
+        $courseClass = CourseClass::findOrFail($id);
+        
+        $fileName = 'DanhSach_ChamDiem_' . $courseClass->code . '.xlsx';
+
+        // Truyền ID của lớp vào file Export
+        return Excel::download(new GradeExport($id), $fileName);
+    }
+
+    /**
+     * Import file Excel kết quả điểm
+     */
+    public function importGrades(Request $request, $id)
+    {
+        // Lát nữa chúng ta sẽ xử lý đọc file Excel ở đây
+        return redirect()->back()->with('success', 'Hàm import đang được xây dựng!');
     }
 }

@@ -73,6 +73,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/grades', [\App\Http\Controllers\SystemAdmin\GradeController::class, 'index'])->name('grades.index');
         Route::get('/grades/{id}', [\App\Http\Controllers\SystemAdmin\GradeController::class, 'show'])->name('grades.show');
         Route::put('/grades/{id}', [\App\Http\Controllers\SystemAdmin\GradeController::class, 'update'])->name('grades.update');
+
+        Route::get('grades/export/template', [\App\Http\Controllers\SystemAdmin\GradeController::class, 'export'])->name('grades.export');
+        Route::post('grades/import/excel', [\App\Http\Controllers\SystemAdmin\GradeController::class, 'import'])->name('grades.import');
         
         // 👇 ĐÃ SỬA: Nối dây điện cho trang Reports
         Route::get('/reports', [SysReportController::class, 'index'])->name('reports.index');
@@ -91,6 +94,11 @@ Route::middleware('auth')->group(function () {
         Route::get('/classes/{courseClass}/edit', [\App\Http\Controllers\SystemAdmin\CourseClassController::class, 'edit'])->name('classes.edit');
         Route::put('/classes/{courseClass}', [\App\Http\Controllers\SystemAdmin\CourseClassController::class, 'update'])->name('classes.update');
         Route::delete('/classes/{courseClass}', [\App\Http\Controllers\SystemAdmin\CourseClassController::class, 'destroy'])->name('classes.destroy');
+        // Route để gọi hàm tải file Excel về (Bỏ /system ở đầu và bỏ system. ở name)
+        Route::get('/classes/{id}/export-grades', [SysCourseClassController::class, 'exportGrades'])->name('classes.export-grades');
+
+        // Route để gọi hàm Import và update điểm
+        Route::post('/classes/{id}/import-grades', [SysCourseClassController::class, 'importGrades'])->name('classes.import-grades');
     });
 
     // ==============================================================
