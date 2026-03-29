@@ -12,7 +12,8 @@ import {
     ClipboardDocumentCheckIcon,
     ClipboardDocumentListIcon,
     ArrowUpTrayIcon,
-    PaperClipIcon
+    PaperClipIcon,
+    ExclamationTriangleIcon // 👉 Thêm Icon Cảnh báo
 } from '@heroicons/vue/20/solid';
 
 const props = defineProps({
@@ -21,7 +22,7 @@ const props = defineProps({
     lessons: { type: Array, default: () => [] },
     documents: { type: Array, default: () => [] },
     assignments: { type: Array, default: () => [] },
-    quizzes: { type: Array, default: () => [] } // 👉 Đã thêm prop quizzes
+    quizzes: { type: Array, default: () => [] }
 });
 
 const activeType = ref(props.lessons.length > 0 ? 'lesson' : (props.assignments.length > 0 ? 'assignment' : null));
@@ -35,6 +36,15 @@ const activeLesson = computed(() => {
 const activeAssignment = computed(() => {
     if (activeType.value !== 'assignment') return null;
     return props.assignments.find(a => a.id === activeId.value) || null;
+});
+
+// 👉 Tính toán xem học viên có được phép nộp Assignment không
+const canSubmitAssignment = computed(() => {
+    // Nếu khóa không có bài quiz nào, dĩ nhiên là cho nộp
+    if (!props.quizzes || props.quizzes.length === 0) return true;
+    
+    // Nếu có quiz, bắt buộc tất cả quiz phải có status là 'passed'
+    return props.quizzes.every(quiz => quiz.status === 'passed');
 });
 
 const submissionForm = useForm({
@@ -284,7 +294,15 @@ const submitAssignment = () => {
                                 <div v-if="submissionForm.errors.answers" class="text-red-600 text-sm mb-3 font-bold bg-red-50 p-2 rounded">{{ submissionForm.errors.answers }}</div>
                                 <div v-if="submissionForm.errors.file" class="text-red-600 text-sm mb-3 font-bold bg-red-50 p-2 rounded">{{ submissionForm.errors.file }}</div>
 
-                                <form @submit.prevent="submitAssignment">
+                                <div v-if="!canSubmitAssignment" class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg mb-6 flex items-start gap-3">
+                                    <ExclamationTriangleIcon class="w-6 h-6 text-yellow-600 shrink-0 mt-0.5" />
+                                    <div>
+                                        <h4 class="text-sm font-bold text-yellow-800">Cần hoàn thành Bài Trắc Nghiệm</h4>
+                                        <p class="text-sm text-yellow-700 mt-1">Khóa học này yêu cầu bạn phải thi và đạt điểm <b>Tất cả các Bài thi Trắc nghiệm</b> trước khi được phép nộp bài Thực hành/Tự luận cuối khóa.</p>
+                                    </div>
+                                </div>
+
+                                <form v-else @submit.prevent="submitAssignment">
                                     <div class="mb-5 space-y-6">
                                         <div v-for="(question, qIndex) in activeAssignment.questions" :key="qIndex">
                                             <label class="block text-sm font-bold text-gray-800 mb-2">Câu {{ qIndex + 1 }}: <span class="font-normal text-gray-600">{{ question }} <span class="text-red-500">*</span></span></label>
@@ -406,7 +424,8 @@ const submitAssignment = () => {
                                         class="w-full text-left p-3 rounded-lg flex gap-3 items-start transition-all hover:bg-gray-50 border border-transparent group">
                                     
                                     <div class="mt-0.5 flex-shrink-0">
-                                        <ClipboardDocumentListIcon class="w-5 h-5 text-gray-400 group-hover:text-indigo-600" />
+                                        <CheckCircleIcon v-if="quiz.status === 'passed'" class="w-5 h-5 text-green-500" />
+                                        <ClipboardDocumentListIcon v-else class="w-5 h-5 text-gray-400 group-hover:text-indigo-600" />
                                     </div>
                                     
                                     <div class="flex-1 min-w-0">

@@ -49,7 +49,10 @@ class MyClassService
         $courseClass = CourseClass::with([
             'course.lessons',
             'course.documents',
-            'course.quizzes', // 👉 THÊM DÒNG NÀY (Load dữ liệu bài trắc nghiệm từ DB)
+            // 👉 Đính kèm bài nộp Quiz của học viên này
+            'course.quizzes.attempts' => function($query) use ($enrollment) {
+                $query->where('class_enrollment_id', $enrollment->id);
+            },
             'course.assignments.submissions' => function($query) use ($userId, $classId) {
                 $query->where('user_id', $userId)->where('course_class_id', $classId);
             }
@@ -109,6 +112,19 @@ class MyClassService
             ];
         });
 
+        // 👉 Format lại Quizzes để Frontend đọc dễ hơn
+        $quizzes = $course->quizzes->map(function ($quiz) {
+            $latestAttempt = $quiz->attempts->sortByDesc('created_at')->first();
+            return [
+                'id' => $quiz->id,
+                'title' => $quiz->title,
+                'duration_minutes' => $quiz->duration_minutes,
+                'pass_score' => $quiz->pass_score,
+                'status' => $latestAttempt ? $latestAttempt->status : null,
+                'score' => $latestAttempt ? $latestAttempt->score : null,
+            ];
+        });
+
         return [
             'classInfo' => [
                 'id' => $courseClass->id,
@@ -123,7 +139,8 @@ class MyClassService
             ],
             'lessons' => $lessons,
             'documents' => $documents,
-            'assignments' => $assignments
+            'assignments' => $assignments,
+            'quizzes' => $quizzes // 👉 Gửi sang giao diện
         ];
     }
 

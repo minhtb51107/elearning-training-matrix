@@ -8,6 +8,7 @@ use App\Models\Quiz;
 use App\Models\QuizAttempt;
 use App\Models\QuizAttemptAnswer;
 use App\Models\ClassEnrollment;
+use App\Enums\EnrollmentStatusEnum; // 👉 Thêm Enum trạng thái
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Carbon\Carbon;
@@ -91,7 +92,7 @@ class QuizController extends Controller
             ->where('status', 'in_progress')
             ->firstOrFail();
 
-        $answers = $request->input('answers', []); // Mảng dạng [question_id => [option_ids]]
+        $answers = $request->input('answers', []); 
         $totalScore = 0;
         $maxScore = 0;
 
@@ -101,10 +102,9 @@ class QuizController extends Controller
             $maxScore += $question->points;
             $selectedOptionIds = $answers[$question->id] ?? [];
             if (!is_array($selectedOptionIds)) {
-                $selectedOptionIds = [$selectedOptionIds]; // Ép kiểu về mảng nếu là câu hỏi single
+                $selectedOptionIds = [$selectedOptionIds];
             }
 
-            // Lưu chi tiết câu trả lời vào DB
             foreach ($selectedOptionIds as $optId) {
                 if ($optId) {
                     QuizAttemptAnswer::create([
@@ -115,27 +115,37 @@ class QuizController extends Controller
                 }
             }
 
-            // Chấm điểm
             $correctOptions = $question->options->where('is_correct', true)->pluck('id')->toArray();
             sort($correctOptions);
             sort($selectedOptionIds);
 
-            // Nếu học viên chọn khớp chính xác tất cả các đáp án đúng
             if (!empty($correctOptions) && $correctOptions == $selectedOptionIds) {
                 $totalScore += $question->points;
             }
         }
 
-        // Quy đổi ra thang điểm 100
         $finalScore = $maxScore > 0 ? round(($totalScore / $maxScore) * 100) : 0;
         $isPassed = $finalScore >= $quiz->pass_score;
 
-        // Cập nhật kết quả vào bài làm
         $attempt->update([
             'score' => $finalScore,
             'status' => $isPassed ? 'passed' : 'failed',
             'completed_at' => Carbon::now()
         ]);
+
+        // 👉 HYBRID LOGIC: Kiểm tra nếu đậu Quiz và khóa học KHÔNG CÓ bài Tự luận
+        if ($isPassed) {
+            $hasAssignment = $courseClass->course->assignments()->exists();
+            
+            if (!$hasAssignment) {
+                // Tự động hoàn thành khóa học luôn
+                $enrollment->update([
+                    'status' => EnrollmentStatusEnum::COMPLETED->value,
+                    'final_score' => $finalScore,
+                    'completed_at' => Carbon::now()
+                ]);
+            }
+        }
 
         return redirect()->route('employee.my-classes.quizzes.result', [$courseClass->id, $quiz->id, $attempt->id])
             ->with('success', 'Đã nộp bài thành công!');
@@ -144,12 +154,10 @@ class QuizController extends Controller
     // Màn hình kết quả
     public function result(CourseClass $courseClass, Quiz $quiz, QuizAttempt $attempt)
     {
-        // Chặn xem kết quả của người khác
         if ($attempt->enrollment->user_id !== auth()->id()) {
             abort(403);
         }
 
-        // Load chi tiết để học viên xem lại bài
         $attempt->load(['answers']);
         $quiz->load('questions.options');
 
