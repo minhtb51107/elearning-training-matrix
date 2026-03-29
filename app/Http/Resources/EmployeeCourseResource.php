@@ -15,7 +15,7 @@ class EmployeeCourseResource extends JsonResource
             'title' => $this->name,
             'description' => $this->description ?: 'Chưa có mô tả',
             'date' => $this->created_at->format('m/Y'),
-            'type' => $this->target_audience === 'Toàn phòng' ? 'Bắt buộc' : 'Tự chọn'
+            'type' => $this->target_audience
         ];
     }
 }

@@ -19,11 +19,11 @@ class CourseClassRequest extends FormRequest
             'max_students' => 'required|integer|min:1',
             'format' => 'required|string|in:Online,Offline,Hybrid',
             'department_id' => 'nullable|exists:departments,id',
+            // Đã xóa bỏ 'roles' hoàn toàn khỏi rules
             'sessions' => 'nullable|array',
             'deleted_session_ids' => 'nullable|array',
         ];
 
-        // Trường 'action' chỉ bắt buộc khi tạo mới (phương thức POST)
         if ($this->isMethod('post')) {
             $rules['action'] = 'required|in:draft,published';
         } else {

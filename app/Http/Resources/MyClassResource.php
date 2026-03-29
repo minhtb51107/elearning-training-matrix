@@ -29,6 +29,7 @@ class MyClassResource extends JsonResource
         $progress = $this->progress_percent ?? 0;
 
         return [
+            // Các trường cũ
             'id' => $cls->id,
             'title' => $cls->code,
             'course_name' => $course ? $course->name : '--',
@@ -38,7 +39,10 @@ class MyClassResource extends JsonResource
             'progress' => $progress,
             'progressText' => $progress . '%',
             'isFailed' => $this->status === EnrollmentStatusEnum::FAILED->value,
-            'btn' => in_array($this->status, [EnrollmentStatusEnum::COMPLETED->value, EnrollmentStatusEnum::FAILED->value]) ? 'Xem kết quả' : 'Bắt đầu học'
+            'btn' => in_array($this->status, [EnrollmentStatusEnum::COMPLETED->value, EnrollmentStatusEnum::FAILED->value]) ? 'Xem kết quả' : 'Bắt đầu học',
+            
+            'is_mandatory' => (bool) $this->is_mandatory,
+            'deadline' => $this->deadline ? Carbon::parse($this->deadline)->format('d/m/Y') : null,
         ];
     }
 }

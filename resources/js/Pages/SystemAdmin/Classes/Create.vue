@@ -22,7 +22,7 @@ const form = useForm({
     department_id: '',
     max_students: '',
     format: props.selectedCourse?.format || 'Offline',
-    roles: 'Team lead',
+    // ĐÃ XÓA BIẾN roles
     action: 'published',
     sessions: []
 });
@@ -185,7 +185,6 @@ const submitForm = (actionType) => {
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1.5">Phòng ban (Áp dụng)</label>
-                                    
                                     <select v-model="form.department_id" :disabled="isDepartmentLocked" class="w-full border-gray-300 rounded-lg shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed">
                                         <option value="" v-if="!isDepartmentLocked && availableDepartments.length === departments.length">-- Toàn công ty --</option>
                                         <option v-for="dept in availableDepartments" :key="dept.id" :value="dept.id">{{ dept.name }}</option>
@@ -201,14 +200,6 @@ const submitForm = (actionType) => {
                                     <div v-if="form.errors.max_students" class="text-red-500 text-xs mt-1">{{ form.errors.max_students }}</div>
                                 </div>
                                 
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Vai trò công việc</label>
-                                    <select v-model="form.roles" class="w-full border-gray-300 rounded-lg shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500">
-                                        <option>Team lead</option>
-                                        <option>Nhân viên</option>
-                                        <option>Trưởng phòng</option>
-                                    </select>
-                                </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1.5">Hình thức chung (Ghi đè khóa học nếu cần)</label>
                                     <select v-model="form.format" class="w-full border-gray-300 rounded-lg shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500">

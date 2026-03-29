@@ -35,7 +35,7 @@ const form = useForm({
     department_id: props.courseClass.department_id || '',
     max_students: props.courseClass.max_students || '',
     format: props.courseClass.format || 'Offline',
-    roles: props.courseClass.roles || 'Team lead',
+    // ĐÃ XÓA BIẾN roles
     action: 'published',
     
     // MẢNG QUẢN LÝ LỊCH HỌC
@@ -43,11 +43,40 @@ const form = useForm({
     deleted_session_ids: []
 });
 
+// QUẢN LÝ RÀNG BUỘC PHÒNG BAN
+const availableDepartments = ref(props.departments);
+const isDepartmentLocked = ref(false);
+
 watch(() => form.course_id, (newCourseId) => {
     const course = props.courses.find(c => c.id === newCourseId);
     if (course) {
         form.duration = course.duration;
         form.format = course.format || 'Offline';
+
+        // ==== LOGIC KẾ THỪA PHẠM VI (DATA BINDING) ====
+        if (course.departments && course.departments.length > 0) {
+            availableDepartments.value = course.departments;
+            
+            // Nếu chỉ có 1 phòng ban -> Khóa cứng lại
+            if (course.departments.length === 1) {
+                form.department_id = course.departments[0].id;
+                isDepartmentLocked.value = true;
+            } else {
+                form.department_id = '';
+                isDepartmentLocked.value = false;
+            }
+        } else {
+            // Nếu là khóa học Toàn công ty
+            availableDepartments.value = props.departments;
+            form.department_id = '';
+            isDepartmentLocked.value = false;
+        }
+    } else {
+        form.duration = '';
+        form.format = 'Offline';
+        availableDepartments.value = props.departments;
+        form.department_id = '';
+        isDepartmentLocked.value = false;
     }
 });
 
@@ -117,6 +146,7 @@ const submitForm = (actionType) => {
                                     </option>
                                 </select>
                             </div>
+                            <div v-if="form.errors.course_id" class="text-red-500 text-xs font-bold mt-1">{{ form.errors.course_id }}</div>
                         </div>
 
                         <div class="mb-10">
@@ -124,7 +154,9 @@ const submitForm = (actionType) => {
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1.5">Mã lớp học</label>
-                                    <input type="text" disabled :value="courseClass.code" class="w-full bg-gray-100 border-gray-200 rounded-lg text-gray-600 text-sm cursor-not-allowed shadow-sm font-bold">
+                                    <div class="flex items-center gap-2">
+                                        <input type="text" disabled :value="courseClass.code" class="w-full bg-gray-50 border-gray-200 rounded-lg text-gray-500 text-sm cursor-not-allowed shadow-sm">
+                                    </div>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1.5">Giảng viên <span class="text-red-500">*</span></label>
@@ -137,7 +169,7 @@ const submitForm = (actionType) => {
                                 
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1.5">Tên lớp học <span class="text-red-500">*</span></label>
-                                    <input v-model="form.name" type="text" required class="w-full border-gray-300 rounded-lg shadow-sm text-sm focus:ring-amber-500 focus:border-amber-500">
+                                    <input v-model="form.name" type="text" placeholder="Ví dụ: K01, Đợt 1..." class="w-full border-gray-300 rounded-lg shadow-sm text-sm focus:ring-amber-500 focus:border-amber-500">
                                     <div v-if="form.errors.name" class="text-red-500 text-xs mt-1">{{ form.errors.name }}</div>
                                 </div>
                                 
@@ -149,10 +181,11 @@ const submitForm = (actionType) => {
                                         <option value="Tối">Tối (18:00 - 21:00)</option>
                                         <option value="Cả ngày">Cả ngày</option>
                                     </select>
+                                    <div v-if="form.errors.shift" class="text-red-500 text-xs mt-1">{{ form.errors.shift }}</div>
                                 </div>
 
                                 <div class="md:col-span-2 p-4 bg-gray-50/50 rounded-lg border border-gray-100">
-                                    <label class="block text-sm font-bold text-gray-700 mb-3">Thời gian diễn ra khóa học:</label>
+                                    <label class="block text-sm font-bold text-gray-700 mb-3">Thời gian diễn ra toàn khóa:</label>
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                         <div>
                                             <div class="flex flex-col gap-1.5">
@@ -178,19 +211,24 @@ const submitForm = (actionType) => {
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1.5">Phòng ban (Áp dụng)</label>
-                                    <select v-model="form.department_id" class="w-full border-gray-300 rounded-lg shadow-sm text-sm focus:ring-amber-500 focus:border-amber-500">
-                                        <option value="">-- Toàn công ty --</option>
-                                        <option v-for="dept in departments" :key="dept.id" :value="dept.id">{{ dept.name }}</option>
+                                    
+                                    <select v-model="form.department_id" :disabled="isDepartmentLocked" class="w-full border-gray-300 rounded-lg shadow-sm text-sm focus:ring-amber-500 focus:border-amber-500 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed">
+                                        <option value="" v-if="!isDepartmentLocked && availableDepartments.length === departments.length">-- Toàn công ty --</option>
+                                        <option v-for="dept in availableDepartments" :key="dept.id" :value="dept.id">{{ dept.name }}</option>
                                     </select>
+                                    
+                                    <div v-if="isDepartmentLocked" class="text-xs text-blue-600 mt-1 font-medium">Lớp học tự động khóa vào phạm vi của Khóa học.</div>
                                     <div v-if="form.errors.department_id" class="text-red-500 text-xs mt-1">{{ form.errors.department_id }}</div>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Sĩ số tối đa <span class="text-red-500">*</span></label>
-                                    <input v-model="form.max_students" type="number" min="1" class="w-full border-gray-300 rounded-lg shadow-sm text-sm focus:ring-amber-500 focus:border-amber-500">
                                 </div>
                                 
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Hình thức</label>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Sĩ số tối đa <span class="text-red-500">*</span></label>
+                                    <input v-model="form.max_students" type="number" min="1" placeholder="VD: 30" class="w-full border-gray-300 rounded-lg shadow-sm text-sm focus:ring-amber-500 focus:border-amber-500">
+                                    <div v-if="form.errors.max_students" class="text-red-500 text-xs mt-1">{{ form.errors.max_students }}</div>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Hình thức chung (Ghi đè khóa học nếu cần)</label>
                                     <select v-model="form.format" class="w-full border-gray-300 rounded-lg shadow-sm text-sm focus:ring-amber-500 focus:border-amber-500">
                                         <option value="Offline">Offline (Tại lớp)</option>
                                         <option value="Online">Online (Zoom/Teams)</option>

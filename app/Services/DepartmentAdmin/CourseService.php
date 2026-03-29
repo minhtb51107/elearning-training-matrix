@@ -125,7 +125,7 @@ class CourseService
             ClassEnrollment::create([
                 'user_id' => $employeeId,
                 'course_class_id' => $courseClassId,
-                'status' => 'Đang học',
+                'status' => \App\Enums\EnrollmentStatusEnum::ENROLLED->value,
                 'is_mandatory' => true,
                 'deadline' => $deadline,
                 'assigned_by' => $assignerId,

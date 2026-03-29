@@ -33,7 +33,7 @@ const initialAssignments = props.course.assignments ? props.course.assignments.m
         id: ass.id,
         title: ass.title,
         type: ass.type,
-        questions: parsedQuestions, // Parse mảng câu hỏi
+        questions: parsedQuestions, 
         pass_score: ass.pass_score,
         is_existing: true
     };
@@ -42,7 +42,7 @@ const initialAssignments = props.course.assignments ? props.course.assignments.m
 const form = useForm({
     _method: 'put',
     name: props.course.name || '',
-    target_audience: props.course.target_audience || 'Toàn phòng',
+    target_audience: props.course.target_audience || 'Toàn công ty',
     format: props.course.format || 'Offline', 
     duration: props.course.duration || '', 
     instructor: props.course.instructor || '',
@@ -53,12 +53,11 @@ const form = useForm({
     lessons: initialLessons,    
     deleted_lesson_ids: [],     
 
-    // MẢNG QUẢN LÝ BÀI KIỂM TRA MỚI THÊM
     assignments: initialAssignments,
     deleted_assignment_ids: [],
 
     new_documents: [],          
-    deleted_document_ids: []    
+    deleted_document_ids: []   
 });
 
 // ==========================================
@@ -96,7 +95,7 @@ const addAssignment = () => {
     form.assignments.push({ 
         title: '', 
         type: 'final', 
-        questions: [''], // Khởi tạo mảng 1 phần tử
+        questions: [''], 
         pass_score: 50, 
         is_existing: false 
     });
@@ -223,12 +222,18 @@ const submitForm = () => {
                                 
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1.5">Đối tượng / Phạm vi đào tạo <span class="text-red-500">*</span></label>
-                                    <select v-model="form.target_audience" required class="w-full border-gray-300 rounded-lg text-sm focus:ring-amber-500 focus:border-amber-500 shadow-sm transition-colors">
-                                        <option>Toàn phòng</option>
-                                        <option>Cấp quản lý</option>
-                                        <option>Nhân viên mới</option>
-                                        <option>Toàn công ty</option>
+                                    <select v-model="form.target_audience" required :disabled="!course.reason" class="w-full border-gray-300 rounded-lg text-sm focus:ring-amber-500 focus:border-amber-500 shadow-sm transition-colors disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed">
+                                        <template v-if="!course.reason">
+                                            <option :value="form.target_audience">{{ form.target_audience }} (Kế thừa từ Yêu cầu)</option>
+                                        </template>
+                                        
+                                        <template v-else>
+                                            <option value="Toàn công ty">Toàn công ty</option>
+                                            <option value="Cấp quản lý">Cấp quản lý (Toàn công ty)</option>
+                                            <option value="Nhân viên mới">Nhân viên mới (Toàn công ty)</option>
+                                        </template>
                                     </select>
+                                    <div v-if="!course.reason" class="text-xs text-blue-600 mt-1 font-medium">Trường này đã bị khóa để đảm bảo đúng yêu cầu của Trưởng phòng.</div>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1.5">Thời lượng dự kiến (Giờ) <span class="text-red-500">*</span></label>
