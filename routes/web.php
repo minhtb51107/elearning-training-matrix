@@ -9,7 +9,7 @@ use App\Http\Controllers\SystemAdmin\CourseController as SysCourseController;
 use App\Http\Controllers\SystemAdmin\CourseClassController as SysCourseClassController;
 use App\Http\Controllers\SystemAdmin\TrainingRequestController as SysTrainingRequestController;
 use App\Http\Controllers\SystemAdmin\EmployeeController as SysEmployeeController;
-use App\Http\Controllers\SystemAdmin\ReportController as SysReportController; // Thêm dòng này
+use App\Http\Controllers\SystemAdmin\ReportController as SysReportController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -42,6 +42,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/courses', [DeptCourseController::class, 'index'])->name('courses.index');
         Route::get('/courses/{id}', [DeptCourseController::class, 'show'])->name('courses.show');
         Route::get('/employees', [DeptEmployeeController::class, 'index'])->name('employees.index');
+
+        // 👇 THÊM 2 ROUTE MỚI CHO TÍNH NĂNG CHỈ ĐỊNH NHÂN VIÊN
+        Route::get('/classes/{courseClass}/eligible-employees', [DeptCourseController::class, 'getEligibleEmployees'])->name('classes.eligible-employees');
+        Route::post('/classes/{courseClass}/assign-employees', [DeptCourseController::class, 'assignEmployees'])->name('classes.assign-employees');
     });
 
     // ==============================================================
@@ -69,36 +73,26 @@ Route::middleware('auth')->group(function () {
         Route::post('/classes/{courseClass}/documents', [SysCourseClassController::class, 'uploadDocument'])->name('classes.upload-document');
         Route::delete('/classes/documents/{document}', [SysCourseClassController::class, 'deleteDocument'])->name('classes.delete-document');
         
-        // ĐÁNH GIÁ & CHẤM BÀI
         Route::get('/grades', [\App\Http\Controllers\SystemAdmin\GradeController::class, 'index'])->name('grades.index');
         Route::get('/grades/{id}', [\App\Http\Controllers\SystemAdmin\GradeController::class, 'show'])->name('grades.show');
         Route::put('/grades/{id}', [\App\Http\Controllers\SystemAdmin\GradeController::class, 'update'])->name('grades.update');
-
         Route::get('grades/export/template', [\App\Http\Controllers\SystemAdmin\GradeController::class, 'export'])->name('grades.export');
         Route::post('grades/import/excel', [\App\Http\Controllers\SystemAdmin\GradeController::class, 'import'])->name('grades.import');
         
-        // 👇 ĐÃ SỬA: Nối dây điện cho trang Reports
         Route::get('/reports', [SysReportController::class, 'index'])->name('reports.index');
-        
         Route::get('/employees', [SysEmployeeController::class, 'index'])->name('employees.index');
-        
-        // GIAO DIỆN SỬA KHÓA HỌC
         Route::get('/courses/{course}/edit', [\App\Http\Controllers\SystemAdmin\CourseController::class, 'edit'])->name('courses.edit');
-
-        // LƯU CẬP NHẬT KHÓA HỌC
         Route::put('/courses/{course}', [\App\Http\Controllers\SystemAdmin\CourseController::class, 'update'])->name('courses.update');
-
-        // XÓA KHÓA HỌC
         Route::delete('/courses/{course}', [\App\Http\Controllers\SystemAdmin\CourseController::class, 'destroy'])->name('courses.destroy');
-
         Route::get('/classes/{courseClass}/edit', [\App\Http\Controllers\SystemAdmin\CourseClassController::class, 'edit'])->name('classes.edit');
         Route::put('/classes/{courseClass}', [\App\Http\Controllers\SystemAdmin\CourseClassController::class, 'update'])->name('classes.update');
         Route::delete('/classes/{courseClass}', [\App\Http\Controllers\SystemAdmin\CourseClassController::class, 'destroy'])->name('classes.destroy');
-        // Route để gọi hàm tải file Excel về (Bỏ /system ở đầu và bỏ system. ở name)
         Route::get('/classes/{id}/export-grades', [SysCourseClassController::class, 'exportGrades'])->name('classes.export-grades');
-
-        // Route để gọi hàm Import và update điểm
         Route::post('/classes/{id}/import-grades', [SysCourseClassController::class, 'importGrades'])->name('classes.import-grades');
+
+        Route::put('/employees/{employee}/hr-info', [SysEmployeeController::class, 'updateHrInfo'])->name('employees.update-hr');
+        Route::get('/classes/{courseClass}/eligible-employees', [SysCourseClassController::class, 'getEligibleEmployees'])->name('classes.eligible-employees');
+Route::post('/classes/{courseClass}/assign-employees', [SysCourseClassController::class, 'assignEmployees'])->name('classes.assign-employees');
     });
 
     // ==============================================================
@@ -109,18 +103,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/courses/{id}', [\App\Http\Controllers\Employee\CourseController::class, 'show'])->name('courses.show');
         Route::post('/classes/{id}/enroll', [\App\Http\Controllers\Employee\CourseController::class, 'enroll'])->name('classes.enroll');
         
-        // Danh sách Lớp học của tôi
         Route::get('/my-classes', [\App\Http\Controllers\Employee\MyClassController::class, 'index'])->name('my-classes');
-        
-        // Chi tiết Lớp học của tôi (Phòng học ảo)
         Route::get('/my-classes/{courseClass}', [\App\Http\Controllers\Employee\MyClassController::class, 'show'])->name('my-classes.show');
-
-        // Route API để đánh dấu hoàn thành bài giảng (Video/Slide)
         Route::post('/my-classes/{courseClass}/complete-lesson', [\App\Http\Controllers\Employee\MyClassController::class, 'completeLesson'])->name('my-classes.complete-lesson');
-        
-        // Route để nộp bài tập / đánh giá
         Route::post('/classes/{courseClass}/submissions', [\App\Http\Controllers\Employee\MyClassController::class, 'submitAssignment'])->name('submissions.store');
-
         Route::get('/my-schedule', [\App\Http\Controllers\Employee\MyScheduleController::class, 'index'])->name('my-schedule');
         Route::get('/results', [\App\Http\Controllers\Employee\ResultController::class, 'index'])->name('results');
         Route::get('/account', function () { return Inertia::render('Employee/Account/Index'); })->name('account');

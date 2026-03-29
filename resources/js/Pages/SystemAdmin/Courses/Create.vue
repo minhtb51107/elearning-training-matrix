@@ -46,7 +46,6 @@ const removeLesson = (index) => {
 
 // HÀM QUẢN LÝ BÀI KIỂM TRA
 const addAssignment = () => {
-    // CHÚ Ý: Đổi từ content: '' thành mảng questions: ['']
     form.assignments.push({ title: '', type: 'final', questions: [''], pass_score: 50 });
 };
 
@@ -194,12 +193,17 @@ const submitForm = () => {
                                 
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1.5">Đối tượng / Phạm vi đào tạo <span class="text-red-500">*</span></label>
-                                    <select v-model="form.target_audience" required class="w-full border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm">
-                                        <option>Toàn phòng</option>
-                                        <option>Cấp quản lý</option>
-                                        <option>Nhân viên mới</option>
-                                        <option>Toàn công ty</option>
+                                    <select v-model="form.target_audience" required :disabled="sourceType === 'request'" class="w-full border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed">
+                                        <template v-if="sourceType === 'request'">
+                                            <option :value="form.target_audience">{{ form.target_audience }} (Kế thừa từ Yêu cầu)</option>
+                                        </template>
+                                        <template v-else>
+                                            <option value="Toàn công ty">Toàn công ty</option>
+                                            <option value="Cấp quản lý">Cấp quản lý (Toàn công ty)</option>
+                                            <option value="Nhân viên mới">Nhân viên mới (Toàn công ty)</option>
+                                        </template>
                                     </select>
+                                    <div v-if="sourceType === 'request'" class="text-xs text-blue-600 mt-1 font-medium">Trường này đã bị khóa để đảm bảo đúng yêu cầu của Trưởng phòng.</div>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1.5">Thời lượng dự kiến (Giờ) <span class="text-red-500">*</span></label>

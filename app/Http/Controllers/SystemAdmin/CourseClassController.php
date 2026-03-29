@@ -7,6 +7,7 @@ use App\Models\CourseClass;
 use App\Models\Course;
 use App\Models\Department;
 use App\Models\Document;
+use App\Enums\RoleEnum; // 👉 Đã thêm dòng này để dùng RoleEnum
 use App\Services\SystemAdmin\CourseClassService;
 use App\Http\Requests\SystemAdmin\CourseClassRequest;
 use App\Http\Requests\SystemAdmin\ClassStatusRequest;
@@ -96,16 +97,16 @@ class CourseClassController extends Controller
         $courseClass->load('course', 'instructor', 'department', 'sessions');
         return Inertia::render('SystemAdmin/Classes/Edit', [
             'courseClass' => $courseClass,
-            'courses' => Course::where('status', '!=', 'Đã kết thúc')->get(),
+            // 👉 ĐÃ SỬA: Load thêm quan hệ 'departments' để giao diện Edit cũng nhận được luồng Data Binding
+            'courses' => Course::with('departments')->where('status', '!=', 'Đã kết thúc')->get(),
             'departments' => Department::all(),
-            // 👉 Sửa 'role', 3 thành RoleEnum
+            // 👉 ĐÃ SỬA: Gọi Role Enum chuẩn
             'instructors' => \App\Models\User::where('role', '!=', RoleEnum::EMPLOYEE->value)->get()
         ]);
     }
 
     public function update(CourseClassRequest $request, CourseClass $courseClass)
     {
-        // Nhờ Form Request, hàm update giờ chỉ còn đúng 2 dòng siêu mỏng
         $this->classService->updateClass($courseClass, $request->validated());
         return redirect()->route('system.classes.index')->with('success', 'Đã cập nhật lớp học và lịch học thành công!');
     }
@@ -116,25 +117,44 @@ class CourseClassController extends Controller
         return redirect()->route('system.classes.index')->with('success', 'Đã xóa lớp học!');
     }
 
-    /**
-     * Xuất file Excel danh sách bài nộp của Lớp
-     */
     public function exportGrades($id)
     {
         $courseClass = CourseClass::findOrFail($id);
-        
         $fileName = 'DanhSach_ChamDiem_' . $courseClass->code . '.xlsx';
-
-        // Truyền ID của lớp vào file Export
         return Excel::download(new GradeExport($id), $fileName);
     }
 
-    /**
-     * Import file Excel kết quả điểm
-     */
     public function importGrades(Request $request, $id)
     {
-        // Lát nữa chúng ta sẽ xử lý đọc file Excel ở đây
         return redirect()->back()->with('success', 'Hàm import đang được xây dựng!');
+    }
+
+    // API Lấy danh sách nhân viên đủ điều kiện (Toàn công ty)
+    public function getEligibleEmployees(Request $request, CourseClass $courseClass)
+    {
+        // System Admin có thể lọc theo phòng ban nếu muốn, hoặc lấy toàn công ty
+        $departmentId = $request->query('department_id'); 
+        $employees = $this->classService->getEligibleEmployees($courseClass->id, $departmentId);
+        
+        return response()->json($employees);
+    }
+
+    // Xử lý lưu Chỉ định Đào tạo (Bắt buộc)
+    public function assignEmployees(Request $request, CourseClass $courseClass)
+    {
+        $validated = $request->validate([
+            'employee_ids' => 'required|array|min:1',
+            'employee_ids.*' => 'exists:users,id',
+            'deadline' => 'nullable|date|after_or_equal:today',
+        ]);
+
+        $this->classService->assignEmployeesToClass(
+            $courseClass->id, 
+            $validated['employee_ids'], 
+            $validated['deadline'] ?? null, 
+            auth()->id()
+        );
+
+        return redirect()->back()->with('success', 'Đã chỉ định ' . count($validated['employee_ids']) . ' nhân sự tham gia lớp học!');
     }
 }

@@ -2,7 +2,7 @@
 import { ref, watch } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { MagnifyingGlassIcon } from '@heroicons/vue/24/outline';
+import { MagnifyingGlassIcon, ExclamationCircleIcon } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
     classes: Object,
@@ -80,8 +80,12 @@ watch(searchForm, (newValue) => {
                             </Link>
                         </div>
 
-                        <div v-for="cls in classes.data" :key="cls.id" class="border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md hover:border-blue-200 transition-all bg-white flex flex-col group">
+                        <div v-for="cls in classes.data" :key="cls.id" class="border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md hover:border-blue-200 transition-all bg-white flex flex-col group relative">
                             
+                            <div v-if="cls.is_mandatory" class="absolute top-3 right-3 z-10 bg-red-600 text-white text-[10px] font-black px-2 py-1 rounded shadow-sm border border-red-800 flex items-center gap-1 uppercase tracking-wider">
+                                <ExclamationCircleIcon class="w-3.5 h-3.5" /> Bắt buộc
+                            </div>
+
                             <div class="h-32 w-full relative overflow-hidden bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center p-4">
                                 <div class="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors"></div>
                                 <h3 class="text-xl font-black text-white text-center drop-shadow-md line-clamp-2 mix-blend-overlay uppercase tracking-wider">{{ cls.title }}</h3>
@@ -102,6 +106,9 @@ watch(searchForm, (newValue) => {
                                             {{ cls.statusText }}
                                         </span>
                                     </p>
+                                    <p v-if="cls.is_mandatory && cls.deadline" class="flex items-center gap-2 text-red-600 font-bold mt-2 bg-red-50 p-1.5 rounded-md border border-red-100">
+                                        <span class="w-4 h-4 text-center">⏰</span> Hạn chót: {{ cls.deadline }}
+                                    </p>
                                 </div>
                                 
                                 <div v-if="cls.progress !== null" class="mb-5">
@@ -116,7 +123,7 @@ watch(searchForm, (newValue) => {
                                     </div>
                                 </div>
                                 
-                                <div class="flex justify-end mt-auto pt-4 border-t border-gray-100">
+                                <div class="flex justify-end mt-auto pt-4 border-t border-gray-100 items-center">
                                     <Link :href="route('employee.my-classes.show', cls.id)" class="text-blue-600 hover:text-blue-800 text-sm font-semibold flex items-center gap-1 group-hover:gap-2 transition-all uppercase tracking-wide">
                                         {{ cls.btn }} <span aria-hidden="true">&rarr;</span>
                                     </Link>

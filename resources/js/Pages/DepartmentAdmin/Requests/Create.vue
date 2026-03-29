@@ -1,7 +1,6 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
-// Tích hợp Heroicons
 import { ArrowLeftIcon, PaperAirplaneIcon, DocumentTextIcon } from '@heroicons/vue/20/solid';
 
 const props = defineProps({
@@ -15,7 +14,7 @@ const form = useForm({
     content: '',
     expected_duration: '',
     notes: '',
-    action: 'pending', // mặc định là gửi duyệt
+    action: 'pending', 
 });
 
 const submitForm = (actionType) => {
@@ -39,7 +38,6 @@ const submitForm = (actionType) => {
                 </div>
 
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-xl border border-gray-200">
-                    
                     <div class="px-6 py-5 border-b border-gray-200 bg-gray-50/50">
                         <h2 class="text-xl font-bold text-gray-900">Tạo yêu cầu đào tạo mới</h2>
                         <p class="text-sm text-gray-500 mt-1">Điền các thông tin chi tiết để đề xuất mở khóa học cho bộ phận của bạn.</p>
@@ -117,7 +115,6 @@ const submitForm = (actionType) => {
                                 </button>
                             </div>
                         </form>
-                        
                     </div>
                 </div>
             </div>

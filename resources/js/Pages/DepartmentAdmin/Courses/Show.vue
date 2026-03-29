@@ -1,7 +1,12 @@
 <script setup>
+import { ref } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, useForm } from '@inertiajs/vue3';
 import { ArrowLeftIcon, InformationCircleIcon, AcademicCapIcon, DocumentTextIcon, LinkIcon, ArrowDownTrayIcon, UsersIcon } from '@heroicons/vue/20/solid';
+import Modal from '@/Components/Modal.vue';
+import PrimaryButton from '@/Components/PrimaryButton.vue';
+import SecondaryButton from '@/Components/SecondaryButton.vue';
+import axios from 'axios';
 
 // Hứng dữ liệu thật từ Controller truyền sang
 const props = defineProps({
@@ -9,6 +14,52 @@ const props = defineProps({
     classes: Array,
     materials: Array
 });
+
+// === LOGIC CHO MODAL CHỈ ĐỊNH NHÂN VIÊN ===
+const showingAssignModal = ref(false);
+const eligibleEmployees = ref([]);
+const isLoadingEmployees = ref(false);
+const selectedClass = ref(null);
+
+const assignForm = useForm({
+    employee_ids: [],
+    deadline: ''
+});
+
+const openAssignModal = async (cls) => {
+    selectedClass.value = cls;
+    showingAssignModal.value = true;
+    isLoadingEmployees.value = true;
+    assignForm.reset();
+    
+    try {
+        // Gọi API lấy nhân viên chưa đăng ký lớp này
+        const response = await axios.get(route('department.classes.eligible-employees', cls.id));
+        eligibleEmployees.value = response.data;
+    } catch (error) {
+        console.error("Lỗi khi tải danh sách nhân viên:", error);
+        alert("Không thể tải danh sách nhân viên. Vui lòng thử lại.");
+    } finally {
+        isLoadingEmployees.value = false;
+    }
+};
+
+const closeAssignModal = () => {
+    showingAssignModal.value = false;
+    assignForm.reset();
+    eligibleEmployees.value = [];
+    selectedClass.value = null;
+};
+
+const submitAssignment = () => {
+    assignForm.post(route('department.classes.assign-employees', selectedClass.value.id), {
+        preserveScroll: true,
+        onSuccess: () => {
+            closeAssignModal();
+            // Optional: Reload lại trang để cập nhật số lượng Đã ĐK
+        }
+    });
+};
 </script>
 
 <template>
@@ -16,7 +67,7 @@ const props = defineProps({
 
     <AuthenticatedLayout>
         <template #header>
-            <Link :href="route('system.courses.index')" class="flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-blue-600 transition-colors">
+            <Link :href="route('department.courses.index')" class="flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-blue-600 transition-colors">
                 <ArrowLeftIcon class="w-4 h-4" />
                 Quay lại danh sách Khóa học
             </Link>
@@ -25,6 +76,10 @@ const props = defineProps({
         <div class="py-8">
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
                 
+                <div v-if="$page.props.flash?.success" class="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg shadow-sm">
+                    <span class="font-medium">{{ $page.props.flash.success }}</span>
+                </div>
+
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-xl border border-gray-200">
                     
                     <div class="px-8 py-6 border-b border-gray-100 bg-gray-50/50">
@@ -81,7 +136,7 @@ const props = defineProps({
                             <div class="lg:col-span-2">
                                 <div class="flex justify-between items-end mb-4 border-b border-gray-100 pb-2">
                                     <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Danh sách lớp học</h3>
-                                    </div>
+                                </div>
                                 
                                 <div class="overflow-x-auto border border-gray-200 rounded-lg">
                                     <table class="min-w-full divide-y divide-gray-200 text-left text-sm">
@@ -90,8 +145,8 @@ const props = defineProps({
                                                 <th class="px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Mã lớp</th>
                                                 <th class="px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Tên lớp</th>
                                                 <th class="px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Giảng viên</th>
-                                                <th class="px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Ngày học</th>
                                                 <th class="px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Đã ĐK</th>
+                                                <th class="px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Thao tác</th>
                                             </tr>
                                         </thead>
                                         <tbody class="bg-white divide-y divide-gray-200">
@@ -104,11 +159,15 @@ const props = defineProps({
                                                 <td class="px-5 py-3 font-semibold text-gray-900">{{ cls.code }}</td>
                                                 <td class="px-5 py-3 font-medium text-gray-800">{{ cls.name }}</td>
                                                 <td class="px-5 py-3 text-gray-600">{{ cls.instructor }}</td>
-                                                <td class="px-5 py-3 text-gray-600">{{ cls.time }}</td>
                                                 <td class="px-5 py-3 text-center">
                                                     <span class="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded-md font-bold text-xs border border-blue-100">
                                                         <UsersIcon class="w-3.5 h-3.5" /> {{ cls.capacity }}
                                                     </span>
+                                                </td>
+                                                <td class="px-5 py-3 text-center">
+                                                    <button @click="openAssignModal(cls)" class="text-xs font-bold bg-indigo-600 text-white px-3 py-1.5 rounded hover:bg-indigo-700 transition-colors">
+                                                        Chỉ định
+                                                    </button>
                                                 </td>
                                             </tr>
                                         </tbody>
@@ -150,5 +209,56 @@ const props = defineProps({
                 </div>
             </div>
         </div>
+
+        <Modal :show="showingAssignModal" @close="closeAssignModal" maxWidth="lg">
+            <div class="p-6">
+                <h2 class="text-lg font-bold text-gray-900 mb-2">
+                    Chỉ định học viên: <span class="text-blue-600">{{ selectedClass?.name }}</span>
+                </h2>
+                <p class="text-sm text-gray-500 mb-4">Chọn những nhân sự trong phòng ban bắt buộc phải hoàn thành khóa học này.</p>
+                
+                <div v-if="isLoadingEmployees" class="text-center py-8 text-gray-500 italic">
+                    Đang tải danh sách nhân sự...
+                </div>
+
+                <div v-else>
+                    <div class="mb-4 border border-gray-200 rounded-lg overflow-hidden">
+                        <div class="bg-gray-50 px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 flex justify-between">
+                            <span>Danh sách nhân viên (Chưa học)</span>
+                            <span>{{ assignForm.employee_ids.length }} / {{ eligibleEmployees.length }} Đã chọn</span>
+                        </div>
+                        <div class="max-h-60 overflow-y-auto p-2">
+                            <div v-if="eligibleEmployees.length === 0" class="p-4 text-center text-sm text-gray-500 italic">
+                                Tất cả nhân viên trong phòng ban của bạn đã tham gia khóa này.
+                            </div>
+                            
+                            <label v-for="emp in eligibleEmployees" :key="emp.id" class="flex items-center gap-3 p-2 hover:bg-gray-50 rounded cursor-pointer transition-colors">
+                                <input type="checkbox" :value="emp.id" v-model="assignForm.employee_ids" class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500" />
+                                <div>
+                                    <div class="text-sm font-bold text-gray-900">{{ emp.name }}</div>
+                                    <div class="text-xs text-gray-500">{{ emp.email }}</div>
+                                </div>
+                            </label>
+                        </div>
+                        <div v-if="assignForm.errors.employee_ids" class="text-red-500 text-xs px-4 pb-2">{{ assignForm.errors.employee_ids }}</div>
+                    </div>
+
+                    <div class="mb-6">
+                        <label class="block text-sm font-bold text-gray-700 mb-1">Hạn chót hoàn thành (Deadline)</label>
+                        <input type="date" v-model="assignForm.deadline" :min="new Date().toISOString().split('T')[0]" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm w-full" />
+                        <p class="text-xs text-gray-500 mt-1">Bỏ trống nếu không giới hạn thời gian.</p>
+                        <div v-if="assignForm.errors.deadline" class="text-red-500 text-xs mt-1">{{ assignForm.errors.deadline }}</div>
+                    </div>
+
+                    <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                        <SecondaryButton @click="closeAssignModal">Hủy bỏ</SecondaryButton>
+                        <PrimaryButton @click="submitAssignment" :class="{ 'opacity-50': assignForm.employee_ids.length === 0 || assignForm.processing }" :disabled="assignForm.employee_ids.length === 0 || assignForm.processing">
+                            Giao việc đào tạo
+                        </PrimaryButton>
+                    </div>
+                </div>
+            </div>
+        </Modal>
+
     </AuthenticatedLayout>
 </template>

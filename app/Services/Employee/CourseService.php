@@ -8,15 +8,36 @@ use App\Models\ClassEnrollment;
 use App\Enums\EnrollmentStatusEnum;
 use App\Notifications\SystemNotification;
 use Illuminate\Support\Facades\Storage;
+use Carbon\Carbon;
 
 class CourseService
 {
     public function getAvailableCourses($user, array $filters)
     {
-        $query = Course::whereHas('departments', function($q) use ($user) {
-            $q->where('departments.id', $user->department_id);
+        // LOGIC CHUẨN: Lọc khóa học dựa trên Thân phận (HR Info) của người dùng
+        $query = Course::where(function($q) use ($user) {
+            
+            // 1. Luôn thấy các khóa học dành cho Toàn công ty
+            $q->where('target_audience', 'Toàn công ty')
+            
+            // 2. Hoặc các khóa học được phân bổ CỤ THỂ cho phòng ban của họ
+              ->orWhereHas('departments', function($subQ) use ($user) {
+                  $subQ->where('departments.id', $user->department_id);
+              });
+
+            // 3. NẾU LÀ QUẢN LÝ: Thấy thêm các khóa học dành riêng cho Cấp quản lý
+            if ($user->is_manager) {
+                $q->orWhere('target_audience', 'Cấp quản lý');
+            }
+
+            // 4. NẾU LÀ LÍNH MỚI (vào làm <= 2 tháng): Thấy thêm khóa Nhân viên mới
+            if ($user->join_date && Carbon::parse($user->join_date)->diffInMonths(now()) <= 2) {
+                $q->orWhere('target_audience', 'Nhân viên mới');
+            }
+
         })->latest();
 
+        // Tìm kiếm theo tên / mã
         if (!empty($filters['keyword'])) {
             $query->where(function($q) use ($filters) {
                 $q->where('name', 'like', '%' . $filters['keyword'] . '%')
@@ -24,11 +45,14 @@ class CourseService
             });
         }
 
+        // Bỏ qua cái filter "Bắt buộc" cũ bị sai logic.
+        // Thực tế Khóa bắt buộc sẽ nằm bên tab "Lớp học của tôi" do Trưởng phòng ép. 
+        // Ở màn hình Khám phá này, nếu UI vẫn truyền filter 'type', ta có thể map tạm để không lỗi UI.
         if (!empty($filters['type']) && $filters['type'] !== 'Tất cả') {
             if ($filters['type'] === 'Bắt buộc') {
-                $query->where('target_audience', 'Toàn phòng');
+                $query->whereIn('target_audience', ['Toàn phòng', 'Toàn công ty']);
             } else {
-                $query->where('target_audience', '!=', 'Toàn phòng');
+                $query->whereNotIn('target_audience', ['Toàn phòng', 'Toàn công ty']);
             }
         }
 

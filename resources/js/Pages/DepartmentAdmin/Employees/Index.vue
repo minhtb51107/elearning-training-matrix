@@ -3,7 +3,6 @@ import { ref } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, router, usePage } from '@inertiajs/vue3';
 import Modal from '@/Components/Modal.vue';
-// Tích hợp Heroicons
 import { MagnifyingGlassIcon, FunnelIcon, PrinterIcon, DocumentArrowDownIcon, XMarkIcon, UserCircleIcon, BookOpenIcon, CheckBadgeIcon } from '@heroicons/vue/20/solid';
 
 const props = defineProps({
@@ -14,7 +13,6 @@ const props = defineProps({
 const page = usePage();
 const currentDepartment = page.props.auth.user.department?.name || 'Chưa xác định';
 
-// Gắn biến cho bộ lọc
 const searchKeyword = ref(props.filters?.keyword || '');
 const filterStatus = ref(props.filters?.status || 'all');
 
@@ -34,13 +32,16 @@ const openModal = (emp) => {
         id: emp.id,
         code: `NV-${String(emp.id).padStart(3, '0')}`,
         name: emp.name,
-        position: 'Nhân viên', 
+        // Cập nhật lấy dữ liệu thực tế
+        position: emp.job_title || 'Chưa cập nhật', 
+        is_manager: emp.is_manager,
+        join_date: emp.join_date,
+
         status: emp.overview?.completed > 0 ? 'Đã có chứng chỉ' : 'Đang đào tạo', 
         progress: '-',
         email: emp.email, 
         department: emp.department?.name || currentDepartment,
         
-        // HỨNG DỮ LIỆU THẬT TỪ CONTROLLER ĐẨY QUANG
         overview: emp.overview || { learning: 0, completed: 0 },
         activeClasses: emp.activeClasses || [],
         history: emp.history || []
@@ -53,7 +54,6 @@ const closeModal = () => {
     setTimeout(() => selectedEmployee.value = null, 200);
 };
 
-// HELPER: Fake Avatar URL dựa trên tên
 const getAvatar = (name) => {
     return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&color=1d4ed8&background=eff6ff`;
 };
@@ -84,7 +84,7 @@ const getAvatar = (name) => {
                                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                         <MagnifyingGlassIcon class="h-4 w-4 text-gray-400" />
                                     </div>
-                                    <input v-model="searchKeyword" @keyup.enter="doSearch" type="text" class="pl-9 w-full border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm" placeholder="Nhập tên / Email..." />
+                                    <input v-model="searchKeyword" @keyup.enter="doSearch" type="text" class="pl-9 w-full border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm" placeholder="Nhập tên / Chức danh..." />
                                 </div>
                             </div>
 
@@ -96,25 +96,16 @@ const getAvatar = (name) => {
                                     </div>
                                     <select v-model="filterStatus" @change="doSearch" class="pl-9 w-full border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm appearance-none">
                                         <option value="all">Tất cả trạng thái</option>
-                                        <option value="in_progress">Đang thực hiện</option>
-                                        <option value="completed">Hoàn thành</option>
-                                        <option value="failed">Chưa hoàn thành</option>
+                                        <option value="in_progress">Đang đào tạo</option>
+                                        <option value="completed">Đã có chứng chỉ</option>
                                     </select>
                                 </div>
                             </div>
                         </div>
 
                         <div class="flex gap-2">
-                            <button class="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors tooltip" title="In danh sách">
-                                <PrinterIcon class="w-5 h-5" />
-                            </button>
                             <button class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors shadow-sm">
-                                <DocumentArrowDownIcon class="w-4 h-4 text-green-600" />
-                                Excel
-                            </button>
-                            <button class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors shadow-sm">
-                                <DocumentArrowDownIcon class="w-4 h-4 text-red-500" />
-                                PDF
+                                <DocumentArrowDownIcon class="w-4 h-4 text-green-600" /> Excel
                             </button>
                         </div>
                     </div>
@@ -125,13 +116,14 @@ const getAvatar = (name) => {
                                 <tr>
                                     <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider w-24">Mã NV</th>
                                     <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Nhân viên</th>
+                                    <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Vai trò / Chức danh</th>
                                     <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Tình trạng đào tạo</th>
-                                    <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Tiến độ</th>
+                                    <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Đang học</th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
                                 <tr v-if="employees.data.length === 0">
-                                    <td colspan="4" class="px-6 py-12 text-center text-gray-500 bg-gray-50/30">
+                                    <td colspan="5" class="px-6 py-12 text-center text-gray-500 bg-gray-50/30">
                                         <div class="flex flex-col items-center">
                                             <UserCircleIcon class="w-10 h-10 text-gray-300 mb-3" />
                                             <p>Chưa có nhân viên nào trong danh sách.</p>
@@ -155,13 +147,25 @@ const getAvatar = (name) => {
                                         </div>
                                     </td>
                                     
+                                    <td class="px-6 py-4">
+                                        <div class="flex flex-col items-start gap-1">
+                                            <span v-if="emp.is_manager" class="inline-flex px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700 border border-purple-200 uppercase">
+                                                Cấp Quản lý
+                                            </span>
+                                            <span v-else class="inline-flex px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-700 border border-gray-200 uppercase">
+                                                Nhân viên
+                                            </span>
+                                            <span class="text-sm font-medium text-gray-800">{{ emp.job_title || 'Chưa cập nhật' }}</span>
+                                        </div>
+                                    </td>
+                                    
                                     <td class="px-6 py-4 text-center">
                                         <span v-if="emp.overview?.completed > 0" class="bg-green-50 text-green-700 px-2.5 py-1 rounded-full text-xs font-medium border border-green-200">Đã có chứng chỉ</span>
                                         <span v-else class="bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full text-xs font-medium border border-blue-200">Đang đánh giá</span>
                                     </td>
                                     
                                     <td class="px-6 py-4 text-center">
-                                        <span v-if="emp.overview?.learning > 0" class="text-blue-600 font-bold">{{ emp.overview.learning }} lớp đang học</span>
+                                        <span v-if="emp.overview?.learning > 0" class="text-blue-600 font-bold">{{ emp.overview.learning }} lớp</span>
                                         <span v-else class="text-gray-400 font-medium">-</span>
                                     </td>
                                 </tr>
@@ -192,11 +196,11 @@ const getAvatar = (name) => {
         <Modal :show="showModal" @close="closeModal" maxWidth="2xl">
             <div v-if="selectedEmployee" class="bg-white rounded-xl overflow-hidden shadow-2xl relative">
                 
-                <button @click="closeModal" class="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors z-10">
+                <button @click="closeModal" class="absolute top-4 right-4 p-2 text-white/70 hover:text-white hover:bg-white/20 rounded-full transition-colors z-10">
                     <XMarkIcon class="w-5 h-5" />
                 </button>
 
-                <div class="h-24 bg-gradient-to-r from-blue-600 to-blue-400 relative"></div>
+                <div class="h-28 bg-gradient-to-r from-blue-700 to-indigo-600 relative"></div>
                 
                 <div class="px-8 pb-8 h-[75vh] overflow-y-auto">
                     <div class="relative -mt-12 mb-4 flex items-end justify-between">
@@ -214,20 +218,26 @@ const getAvatar = (name) => {
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-8 mb-8">
                         <div>
                             <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 border-b border-gray-100 pb-2">Thông tin công việc</h4>
-                            <div class="space-y-4 text-sm">
+                            <div class="bg-gray-50 border border-gray-100 rounded-lg p-4 space-y-3 text-sm">
                                 <div>
-                                    <p class="text-gray-500 mb-1">Phòng ban</p>
-                                    <p class="font-semibold text-gray-900">{{ selectedEmployee.department }}</p>
+                                    <p class="text-gray-500 mb-0.5 text-xs">Cấp bậc / Vai trò</p>
+                                    <p class="font-bold text-gray-900" :class="selectedEmployee.is_manager ? 'text-purple-700' : ''">
+                                        {{ selectedEmployee.is_manager ? 'Quản lý cấp trung' : 'Nhân viên' }}
+                                    </p>
                                 </div>
                                 <div>
-                                    <p class="text-gray-500 mb-1">Vị trí chức danh</p>
-                                    <p class="font-semibold text-gray-900">{{ selectedEmployee.position }}</p>
+                                    <p class="text-gray-500 mb-0.5 text-xs">Chức danh chi tiết</p>
+                                    <p class="font-bold text-gray-900">{{ selectedEmployee.position }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-gray-500 mb-0.5 text-xs">Ngày gia nhập (Onboard)</p>
+                                    <p class="font-bold text-gray-900">{{ selectedEmployee.join_date ? new Date(selectedEmployee.join_date).toLocaleDateString('vi-VN') : 'Chưa cập nhật' }}</p>
                                 </div>
                             </div>
                         </div>
 
                         <div>
-                            <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 border-b border-gray-100 pb-2">Tổng quan đào tạo</h4>
+                            <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 border-b border-gray-100 pb-2">Tiến độ tổng quan</h4>
                             <div class="grid grid-cols-2 gap-4">
                                 <div class="bg-blue-50/50 border border-blue-100 p-4 rounded-xl flex flex-col items-center justify-center text-center">
                                     <BookOpenIcon class="w-6 h-6 text-blue-500 mb-2" />
@@ -237,14 +247,14 @@ const getAvatar = (name) => {
                                 <div class="bg-green-50/50 border border-green-100 p-4 rounded-xl flex flex-col items-center justify-center text-center">
                                     <CheckBadgeIcon class="w-6 h-6 text-green-500 mb-2" />
                                     <span class="text-2xl font-black text-green-700 leading-none">{{ selectedEmployee.overview.completed }}</span>
-                                    <span class="text-xs font-medium text-green-600 mt-1">Khóa hoàn thành</span>
+                                    <span class="text-xs font-medium text-green-600 mt-1">Hoàn thành</span>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     <div class="mb-6">
-                        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Lớp học đang tham gia</h4>
+                        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Khóa đào tạo đang tham gia</h4>
                         <div v-if="selectedEmployee.activeClasses.length === 0" class="bg-gray-50 border border-gray-100 rounded-lg p-6 text-center text-sm text-gray-500 italic">
                             Nhân viên này chưa tham gia lớp học nào.
                         </div>

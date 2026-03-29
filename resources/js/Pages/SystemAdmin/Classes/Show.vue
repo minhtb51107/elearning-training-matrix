@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import Modal from '@/Components/Modal.vue';
+import axios from 'axios'; // Bổ sung axios để gọi API
 import { 
     ChevronLeftIcon, 
     UsersIcon, 
@@ -12,13 +13,13 @@ import {
     UserPlusIcon, 
     ArrowUpTrayIcon,
     MagnifyingGlassIcon,
-    DocumentArrowDownIcon // Icon mới cho Export
+    DocumentArrowDownIcon
 } from '@heroicons/vue/20/solid';
 
 const props = defineProps({
     courseClass: Object,
-    availableUsers: Array,
-    resultsData: Array // Hứng data điểm từ Controller
+    availableUsers: Array, // Mảng cũ (giờ có thể không dùng nhiều vì đã dùng API)
+    resultsData: Array 
 });
 
 const activeTab = ref('Học viên'); 
@@ -68,53 +69,6 @@ const students = computed(() => {
     }));
 });
 
-// ==========================================
-// LOGIC MODAL THÊM HỌC VIÊN + TÌM KIẾM
-// ==========================================
-const showAddStudentModal = ref(false);
-const selectedUserIds = ref([]);
-const searchQuery = ref('');
-
-const filteredUsers = computed(() => {
-    if (!searchQuery.value) return props.availableUsers;
-    const lowerQuery = searchQuery.value.toLowerCase();
-    
-    return props.availableUsers.filter(user => 
-        user.name.toLowerCase().includes(lowerQuery) ||
-        user.email.toLowerCase().includes(lowerQuery) ||
-        (user.department?.name || '').toLowerCase().includes(lowerQuery)
-    );
-});
-
-const isAllSelected = computed(() => {
-    if (filteredUsers.value.length === 0) return false;
-    return filteredUsers.value.every(user => selectedUserIds.value.includes(user.id));
-});
-
-const toggleSelectAll = (e) => {
-    if (e.target.checked) {
-        const newIds = filteredUsers.value.map(u => u.id);
-        selectedUserIds.value = [...new Set([...selectedUserIds.value, ...newIds])];
-    } else {
-        const filteredIds = filteredUsers.value.map(u => u.id);
-        selectedUserIds.value = selectedUserIds.value.filter(id => !filteredIds.includes(id));
-    }
-};
-
-const submitAddStudents = () => {
-    if(selectedUserIds.value.length === 0) return alert('Vui lòng chọn ít nhất 1 học viên');
-    router.post(route('system.classes.add-students', props.courseClass.id), {
-        user_ids: selectedUserIds.value
-    }, {
-        onSuccess: () => {
-            showAddStudentModal.value = false;
-            selectedUserIds.value = [];
-            searchQuery.value = '';
-        },
-        preserveScroll: true
-    });
-};
-
 const removeStudent = (studentId, studentName) => {
     if (confirm(`Bạn có chắc chắn muốn gỡ học viên [ ${studentName} ] khỏi lớp này?`)) {
         router.delete(route('system.classes.remove-student', { 
@@ -122,6 +76,81 @@ const removeStudent = (studentId, studentName) => {
             studentId: studentId 
         }), { preserveScroll: true });
     }
+};
+
+// ==========================================
+// LOGIC MODAL CHỈ ĐỊNH ĐÀO TẠO THÔNG MINH
+// ==========================================
+const showingAssignModal = ref(false);
+const eligibleEmployees = ref([]);
+const isLoadingEmployees = ref(false);
+const searchQuery = ref('');
+
+const assignForm = useForm({
+    employee_ids: [],
+    deadline: ''
+});
+
+// Gọi API lấy danh sách học viên thỏa mãn điều kiện
+const loadEligibleEmployees = async () => {
+    isLoadingEmployees.value = true;
+    try {
+        const response = await axios.get(route('system.classes.eligible-employees', props.courseClass.id));
+        eligibleEmployees.value = response.data;
+    } catch (error) {
+        console.error("Lỗi tải danh sách:", error);
+    } finally {
+        isLoadingEmployees.value = false;
+    }
+};
+
+const openAssignModal = () => {
+    showingAssignModal.value = true;
+    assignForm.reset();
+    searchQuery.value = '';
+    loadEligibleEmployees();
+};
+
+const closeAssignModal = () => {
+    showingAssignModal.value = false;
+    assignForm.reset();
+};
+
+const filteredUsers = computed(() => {
+    if (!searchQuery.value) return eligibleEmployees.value;
+    const lowerQuery = searchQuery.value.toLowerCase();
+    
+    return eligibleEmployees.value.filter(user => 
+        user.name.toLowerCase().includes(lowerQuery) ||
+        user.email.toLowerCase().includes(lowerQuery) ||
+        (user.department?.name || '').toLowerCase().includes(lowerQuery) ||
+        (user.job_title || '').toLowerCase().includes(lowerQuery)
+    );
+});
+
+const isAllSelected = computed(() => {
+    if (filteredUsers.value.length === 0) return false;
+    return filteredUsers.value.every(user => assignForm.employee_ids.includes(user.id));
+});
+
+const toggleSelectAll = (e) => {
+    if (e.target.checked) {
+        const newIds = filteredUsers.value.map(u => u.id);
+        assignForm.employee_ids = [...new Set([...assignForm.employee_ids, ...newIds])];
+    } else {
+        const filteredIds = filteredUsers.value.map(u => u.id);
+        assignForm.employee_ids = assignForm.employee_ids.filter(id => !filteredIds.includes(id));
+    }
+};
+
+const submitAssignment = () => {
+    if(assignForm.employee_ids.length === 0) return alert('Vui lòng chọn ít nhất 1 học viên');
+    assignForm.post(route('system.classes.assign-employees', props.courseClass.id), {
+        onSuccess: () => {
+            closeAssignModal();
+        },
+        preserveScroll: true
+    });
 };
 
 // ==========================================
@@ -167,14 +196,12 @@ const deleteDoc = (doc) => {
 // ==========================================
 // LOGIC IMPORT/EXPORT EXCEL CHẤM ĐIỂM
 // ==========================================
-
 const showImportGradesModal = ref(false);
 const importForm = useForm({
     excel_file: null,
 });
 
 const handleExportTemplate = () => {
-    // Gọi route xuất file Excel (bạn cần tạo route này trong backend Laravel)
     window.location.href = route('system.classes.export-grades', props.courseClass.id);
 };
 
@@ -185,12 +212,11 @@ const submitImportGrades = () => {
         onSuccess: () => {
             showImportGradesModal.value = false;
             importForm.reset();
-            alert('Cập nhật điểm thành công!'); // Có thể thay bằng flash message
+            alert('Cập nhật điểm thành công!'); 
         },
         preserveScroll: true
     });
 };
-
 </script>
 
 <template>
@@ -291,8 +317,8 @@ const submitImportGrades = () => {
                         <div v-if="activeTab === 'Học viên'">
                             <div class="flex justify-between items-center mb-4">
                                 <h3 class="text-base font-bold text-gray-800">Danh sách học viên</h3>
-                                <button @click="showAddStudentModal = true" class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 shadow-sm transition-colors">
-                                    <UserPlusIcon class="w-4 h-4 text-blue-600" /> Thêm học viên
+                                <button @click="openAssignModal" class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-blue-300 rounded-lg text-sm font-semibold text-blue-700 hover:bg-blue-50 shadow-sm transition-colors">
+                                    <UserPlusIcon class="w-4 h-4 text-blue-600" /> Chỉ định Đào tạo
                                 </button>
                             </div>
                             
@@ -371,8 +397,8 @@ const submitImportGrades = () => {
                                 <h3 class="text-base font-bold text-gray-800">Kết quả Học tập & Điểm số</h3>
                                 <div class="flex gap-3">
                                     <a :href="route('system.classes.export-grades', props.courseClass.id)" class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 shadow-sm transition-colors">
-    <DocumentArrowDownIcon class="w-4 h-4 text-green-600" /> Xuất DS chấm điểm (Excel)
-</a>
+                                        <DocumentArrowDownIcon class="w-4 h-4 text-green-600" /> Xuất DS chấm điểm (Excel)
+                                    </a>
                                     <button @click="showImportGradesModal = true" class="inline-flex items-center gap-2 px-4 py-2 bg-green-600 border border-transparent rounded-lg text-sm font-semibold text-white hover:bg-green-700 shadow-sm transition-colors">
                                         <ArrowUpTrayIcon class="w-4 h-4" /> Import Điểm Excel
                                     </button>
@@ -409,7 +435,7 @@ const submitImportGrades = () => {
                                                 <span class="font-bold" :class="res.progress === 100 ? 'text-green-600' : 'text-blue-600'">{{ res.progress }}%</span>
                                             </td>
                                             <td class="px-6 py-4 text-center">
-                                                <span v-if="!res.has_final" class="text-gray-400 text-xs italic">Không có bài test</span>
+                                                <span v-if="!res.has_final" class="text-gray-400 text-xs italic">Không có test</span>
                                                 <span v-else-if="res.submission_status === 'Chưa nộp'" class="px-2.5 py-1 bg-gray-100 text-gray-600 rounded text-xs font-medium border border-gray-200">Chưa nộp</span>
                                                 <span v-else-if="res.submission_status === 'Chờ chấm'" class="px-2.5 py-1 bg-yellow-50 text-yellow-700 rounded text-xs font-medium border border-yellow-200">Chờ chấm</span>
                                                 <span v-else class="px-2.5 py-1 bg-green-50 text-green-700 rounded text-xs font-bold border border-green-200">Đã chấm</span>
@@ -436,53 +462,75 @@ const submitImportGrades = () => {
             </div>
         </div>
 
-        <Modal :show="showAddStudentModal" @close="showAddStudentModal = false" maxWidth="2xl">
+        <Modal :show="showingAssignModal" @close="closeAssignModal" maxWidth="3xl">
             <div class="bg-white rounded-xl overflow-hidden shadow-2xl">
                 <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                    <h3 class="text-lg font-bold text-gray-900">Thêm học viên vào lớp</h3>
-                    <button @click="showAddStudentModal = false" class="text-gray-400 hover:text-gray-600 transition-colors"><XMarkIcon class="w-6 h-6" /></button>
+                    <h3 class="text-lg font-bold text-gray-900">Chỉ định Đào tạo Thông minh</h3>
+                    <button @click="closeAssignModal" class="text-gray-400 hover:text-gray-600 transition-colors"><XMarkIcon class="w-6 h-6" /></button>
                 </div>
                 
                 <div class="p-6">
-                    
-                    <div class="mb-4 relative">
-                        <input v-model="searchQuery" type="text" placeholder="Tìm theo tên, email, phòng ban..." class="w-full pl-10 border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm">
+                    <div class="mb-4 bg-blue-50 text-blue-800 text-sm p-3 rounded-lg border border-blue-100">
+                        <span class="font-bold">Đối tượng ưu tiên: </span> {{ props.courseClass.course?.target_audience || 'Toàn công ty' }}.
+                        Hệ thống đã tự động lọc danh sách nhân sự phù hợp chưa tham gia lớp này.
                     </div>
 
-                    <div class="max-h-[350px] overflow-y-auto border border-gray-200 rounded-lg mb-6 shadow-inner relative">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                        <div class="relative">
+                            <label class="block text-xs font-bold text-gray-700 mb-1">Tìm kiếm nhân sự</label>
+                            <input v-model="searchQuery" type="text" placeholder="Tìm theo tên, email, chức danh..." class="w-full pl-10 border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm">
+                            <MagnifyingGlassIcon class="w-4 h-4 text-gray-400 absolute left-3 top-[26px]" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1">Hạn chót hoàn thành (Bắt buộc) <span class="text-red-500">*</span></label>
+                            <input v-model="assignForm.deadline" type="date" required class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm">
+                        </div>
+                    </div>
+
+                    <div v-if="isLoadingEmployees" class="py-10 text-center text-gray-500 italic">Đang tải danh sách nhân sự phù hợp...</div>
+                    
+                    <div v-else class="max-h-[350px] overflow-y-auto border border-gray-200 rounded-lg mb-6 shadow-inner relative">
                         <table class="min-w-full text-sm text-left whitespace-nowrap">
                             <thead class="bg-gray-100 sticky top-0 z-10 shadow-sm">
                                 <tr>
                                     <th class="px-4 py-3 w-10 text-center">
                                         <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer">
                                     </th>
-                                    <th class="px-4 py-3 font-bold text-gray-700">Tên nhân viên</th>
+                                    <th class="px-4 py-3 font-bold text-gray-700">Nhân sự</th>
                                     <th class="px-4 py-3 font-bold text-gray-700">Phòng ban</th>
-                                    <th class="px-4 py-3 font-bold text-gray-700">Email</th>
+                                    <th class="px-4 py-3 font-bold text-gray-700">Chức danh / Vai trò</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200 bg-white">
                                 <tr v-if="filteredUsers.length === 0">
                                     <td colspan="4" class="px-4 py-8 text-center text-gray-500 italic bg-gray-50/50">
-                                        {{ searchQuery ? 'Không tìm thấy nhân viên nào khớp với từ khóa.' : 'Tất cả nhân viên phù hợp đã được thêm vào lớp.' }}
+                                        Không tìm thấy nhân sự nào khớp điều kiện.
                                     </td>
                                 </tr>
                                 <tr v-for="user in filteredUsers" :key="user.id" class="hover:bg-blue-50/50 cursor-pointer transition-colors">
                                     <td class="px-4 py-3 text-center">
-                                        <input type="checkbox" :value="user.id" v-model="selectedUserIds" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer">
+                                        <input type="checkbox" :value="user.id" v-model="assignForm.employee_ids" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer">
                                     </td>
-                                    <td class="px-4 py-3 text-gray-900 font-semibold">{{ user.name }}</td>
-                                    <td class="px-4 py-3 text-gray-600">{{ user.department?.name || '--' }}</td>
-                                    <td class="px-4 py-3 text-gray-600">{{ user.email }}</td>
+                                    <td class="px-4 py-3">
+                                        <p class="font-bold text-gray-900">{{ user.name }}</p>
+                                        <p class="text-xs text-gray-500">{{ user.email }}</p>
+                                    </td>
+                                    <td class="px-4 py-3 text-gray-600 font-medium">{{ user.department?.name || '--' }}</td>
+                                    <td class="px-4 py-3">
+                                        <span v-if="user.is_manager" class="text-[10px] font-bold bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded uppercase">Quản lý</span>
+                                        <span v-else class="text-[10px] font-bold bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded uppercase">Nhân viên</span>
+                                        <p class="text-xs text-gray-600 mt-0.5">{{ user.job_title || '--' }}</p>
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
+                    
                     <div class="flex justify-between items-center">
-                        <p class="text-sm text-gray-500">Đã chọn: <span class="font-bold text-blue-600">{{ selectedUserIds.length }}</span> nhân viên</p>
+                        <p class="text-sm text-gray-500">Đã chọn: <span class="font-bold text-blue-600">{{ assignForm.employee_ids.length }}</span> nhân sự</p>
                         <div class="flex gap-3">
-                            <button @click="showAddStudentModal = false" class="px-5 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">Hủy</button>
-                            <button @click="submitAddStudents" class="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-sm shadow-blue-600/30 transition-colors">Xác nhận thêm</button>
+                            <button @click="closeAssignModal" class="px-5 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">Hủy</button>
+                            <button @click="submitAssignment" class="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-sm shadow-blue-600/30 transition-colors">Giao việc Bắt buộc</button>
                         </div>
                     </div>
                 </div>
@@ -501,7 +549,6 @@ const submitImportGrades = () => {
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1.5">Tên hiển thị tài liệu <span class="text-red-500">*</span></label>
                             <input v-model="docForm.name" type="text" placeholder="Ví dụ: Bài tập thực hành buổi 1" class="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 shadow-sm text-sm">
-                            <div v-if="docForm.errors.name" class="text-red-600 text-xs font-medium mt-1">{{ docForm.errors.name }}</div>
                         </div>
 
                         <div>
@@ -510,13 +557,11 @@ const submitImportGrades = () => {
                                 <option value="file">File Máy tính (PDF/Word/Excel...)</option>
                                 <option value="link">Đường dẫn Link (Web/Drive)</option>
                             </select>
-                            <div v-if="docForm.errors.type" class="text-red-600 text-xs font-medium mt-1">{{ docForm.errors.type }}</div>
                         </div>
 
                         <div v-if="docForm.type === 'link'">
                             <label class="block text-sm font-medium text-gray-700 mb-1.5">Đường dẫn URL <span class="text-red-500">*</span></label>
                             <input v-model="docForm.url" type="url" placeholder="https://..." class="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 shadow-sm text-sm">
-                            <div v-if="docForm.errors.url" class="text-red-600 text-xs font-medium mt-1">{{ docForm.errors.url }}</div>
                         </div>
 
                         <div v-else>
@@ -526,20 +571,17 @@ const submitImportGrades = () => {
                                 <div class="space-y-1 text-center">
                                     <ArrowUpTrayIcon class="mx-auto h-8 w-8 text-gray-400" />
                                     <div class="flex text-sm text-gray-600 justify-center">
-                                        <span class="font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none">Tải file lên</span>
-                                        <p class="pl-1">hoặc kéo thả vào đây</p>
+                                        <span class="font-medium text-blue-600">Tải file lên</span>
                                     </div>
-                                    <p class="text-xs text-gray-500">{{ docForm.file ? docForm.file.name : 'PDF, DOC, XLS, PPT (Tối đa 20MB)' }}</p>
+                                    <p class="text-xs text-gray-500">{{ docForm.file ? docForm.file.name : 'PDF, DOC, XLS, PPT' }}</p>
                                 </div>
                             </div>
-                            <div v-if="docForm.errors.file" class="text-red-600 text-xs font-medium mt-1">{{ docForm.errors.file }}</div>
                         </div>
                     </div>
 
                     <div class="flex justify-end gap-3">
                         <button type="button" @click="showAddDocModal = false" class="px-5 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">Hủy bỏ</button>
-                        <button type="submit" :disabled="docForm.processing" class="inline-flex items-center gap-2 px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-sm shadow-blue-600/30 transition-colors disabled:opacity-50">
-                            <span v-if="docForm.processing" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+                        <button type="submit" :disabled="docForm.processing" class="inline-flex items-center gap-2 px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-sm transition-colors">
                             {{ docForm.processing ? 'Đang xử lý...' : 'Xác nhận tải lên' }}
                         </button>
                     </div>
@@ -555,36 +597,24 @@ const submitImportGrades = () => {
                 </div>
                 
                 <div class="p-6">
-                    <div class="mb-6 bg-blue-50 border border-blue-100 rounded-lg p-4 text-sm text-blue-800">
-                        <p class="font-bold mb-1">Hướng dẫn:</p>
-                        <ol class="list-decimal ml-5 space-y-1">
-                            <li>Xuất danh sách chấm điểm (File Excel).</li>
-                            <li>Giảng viên điền điểm và lời phê vào file.</li>
-                            <li>Upload file đã điền vào đây để hệ thống tự động cập nhật.</li>
-                        </ol>
-                    </div>
-
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Chọn File Excel đã chấm điểm <span class="text-red-500">*</span></label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Chọn File Excel <span class="text-red-500">*</span></label>
                         <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors relative cursor-pointer">
                             <input type="file" accept=".xlsx, .xls" @input="importForm.excel_file = $event.target.files[0]" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
                             <div class="space-y-1 text-center">
                                 <ArrowUpTrayIcon class="mx-auto h-8 w-8 text-green-500" />
                                 <div class="flex text-sm text-gray-600 justify-center">
-                                    <span class="font-medium text-green-600 hover:text-green-500 focus-within:outline-none">Tải file Excel lên</span>
-                                    <p class="pl-1">hoặc kéo thả vào đây</p>
+                                    <span class="font-medium text-green-600">Tải file Excel lên</span>
                                 </div>
                                 <p class="text-xs text-gray-500">{{ importForm.excel_file ? importForm.excel_file.name : 'Chỉ hỗ trợ file .xlsx, .xls' }}</p>
                             </div>
                         </div>
-                        <div v-if="importForm.errors.excel_file" class="text-red-600 text-xs font-medium mt-1">{{ importForm.errors.excel_file }}</div>
                     </div>
 
                     <div class="flex justify-end gap-3 mt-8">
                         <button type="button" @click="showImportGradesModal = false" class="px-5 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">Hủy</button>
-                        <button type="submit" :disabled="importForm.processing" class="inline-flex items-center gap-2 px-5 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 shadow-sm shadow-green-600/30 transition-colors disabled:opacity-50">
-                            <span v-if="importForm.processing" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
-                            {{ importForm.processing ? 'Đang xử lý...' : 'Cập nhật điểm' }}
+                        <button type="submit" :disabled="importForm.processing" class="inline-flex items-center gap-2 px-5 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 shadow-sm transition-colors">
+                            Cập nhật điểm
                         </button>
                     </div>
                 </div>

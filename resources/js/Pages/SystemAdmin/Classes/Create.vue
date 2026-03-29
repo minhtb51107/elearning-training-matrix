@@ -1,5 +1,5 @@
 <script setup>
-import { watch } from 'vue';
+import { ref, watch } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { ChevronLeftIcon, PlusCircleIcon, XMarkIcon } from '@heroicons/vue/20/solid';
@@ -24,22 +24,46 @@ const form = useForm({
     format: props.selectedCourse?.format || 'Offline',
     roles: 'Team lead',
     action: 'published',
-    // MẢNG QUẢN LÝ CÁC BUỔI HỌC
     sessions: []
 });
+
+// QUẢN LÝ RÀNG BUỘC PHÒNG BAN
+const availableDepartments = ref(props.departments);
+const isDepartmentLocked = ref(false);
 
 watch(() => form.course_id, (newCourseId) => {
     const course = props.courses.find(c => c.id === newCourseId);
     if (course) {
         form.duration = course.duration;
         form.format = course.format || 'Offline';
+
+        // ==== LOGIC KẾ THỪA PHẠM VI (DATA BINDING) ====
+        if (course.departments && course.departments.length > 0) {
+            availableDepartments.value = course.departments;
+            
+            // Nếu chỉ có 1 phòng ban -> Khóa cứng lại
+            if (course.departments.length === 1) {
+                form.department_id = course.departments[0].id;
+                isDepartmentLocked.value = true;
+            } else {
+                form.department_id = '';
+                isDepartmentLocked.value = false;
+            }
+        } else {
+            // Nếu là khóa học Toàn công ty
+            availableDepartments.value = props.departments;
+            form.department_id = '';
+            isDepartmentLocked.value = false;
+        }
     } else {
         form.duration = '';
         form.format = 'Offline';
+        availableDepartments.value = props.departments;
+        form.department_id = '';
+        isDepartmentLocked.value = false;
     }
 });
 
-// HÀM QUẢN LÝ BUỔI HỌC
 const addSession = () => {
     form.sessions.push({
         date: '',
@@ -161,12 +185,16 @@ const submitForm = (actionType) => {
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1.5">Phòng ban (Áp dụng)</label>
-                                    <select v-model="form.department_id" class="w-full border-gray-300 rounded-lg shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500">
-                                        <option value="">-- Toàn công ty --</option>
-                                        <option v-for="dept in departments" :key="dept.id" :value="dept.id">{{ dept.name }}</option>
+                                    
+                                    <select v-model="form.department_id" :disabled="isDepartmentLocked" class="w-full border-gray-300 rounded-lg shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed">
+                                        <option value="" v-if="!isDepartmentLocked && availableDepartments.length === departments.length">-- Toàn công ty --</option>
+                                        <option v-for="dept in availableDepartments" :key="dept.id" :value="dept.id">{{ dept.name }}</option>
                                     </select>
+                                    
+                                    <div v-if="isDepartmentLocked" class="text-xs text-blue-600 mt-1 font-medium">Lớp học tự động khóa vào phạm vi của Khóa học.</div>
                                     <div v-if="form.errors.department_id" class="text-red-500 text-xs mt-1">{{ form.errors.department_id }}</div>
                                 </div>
+                                
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1.5">Sĩ số tối đa <span class="text-red-500">*</span></label>
                                     <input v-model="form.max_students" type="number" min="1" placeholder="VD: 30" class="w-full border-gray-300 rounded-lg shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500">

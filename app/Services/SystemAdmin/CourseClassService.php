@@ -14,6 +14,7 @@ use App\Models\Submission;
 use App\Notifications\SystemNotification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon; // BẮT BUỘC ĐỂ SỬ DỤNG HÀM XỬ LÝ NGÀY THÁNG
 
 class CourseClassService
 {
@@ -43,10 +44,11 @@ class CourseClassService
     public function getCreateData($courseId)
     {
         return [
-            'courses' => Course::select('id', 'code', 'name', 'duration')
+            'courses' => Course::with('departments:id,name')
+                ->select('id', 'code', 'name', 'duration', 'format')
                 ->whereIn('status', ['Chưa có lớp', 'Đang triển khai', 'Đang mở'])
                 ->get(),
-            'selectedCourse' => $courseId ? Course::find($courseId) : null,
+            'selectedCourse' => $courseId ? Course::with('departments:id,name')->find($courseId) : null,
             'departments' => Department::select('id', 'name')->orderBy('name')->get(),
             'instructors' => Instructor::select('id', 'name', 'email')->get()
         ];
@@ -266,5 +268,66 @@ class CourseClassService
                 }
             }
         });
+    }
+
+    // ==============================================================
+    // LOGIC LỌC & GÁN NHÂN VIÊN THÔNG MINH DÀNH CHO ADMIN
+    // ==============================================================
+    public function getEligibleEmployees($courseClassId, $departmentId = null)
+    {
+        $courseClass = CourseClass::with('course')->findOrFail($courseClassId);
+        $targetAudience = $courseClass->course->target_audience;
+
+        $enrolledUserIds = ClassEnrollment::where('course_class_id', $courseClassId)->pluck('user_id');
+
+        // Khởi tạo Query lấy Nhân viên (Role 3)
+        $query = User::with('department')
+                   ->where('role', \App\Enums\RoleEnum::EMPLOYEE->value)
+                   ->whereNotIn('id', $enrolledUserIds);
+
+        // NẾU LỚP HỌC BỊ KHÓA VÀO PHÒNG BAN HOẶC ADMIN CHỦ ĐỘNG LỌC
+        if ($departmentId) {
+            $query->where('department_id', $departmentId);
+        } elseif ($courseClass->department_id) {
+            $query->where('department_id', $courseClass->department_id);
+        }
+
+        // BỘ LỌC THÔNG MINH THEO ĐỐI TƯỢNG CỦA KHÓA HỌC
+        if ($targetAudience === 'Cấp quản lý') {
+            $query->where('is_manager', true);
+            
+        } elseif ($targetAudience === 'Nhân viên mới') {
+            $query->whereNotNull('join_date')
+                  ->where('join_date', '>=', Carbon::now()->subMonths(2));
+        }
+
+        return $query->select('id', 'name', 'email', 'job_title', 'is_manager', 'department_id')->get();
+    }
+
+    public function assignEmployeesToClass($courseClassId, array $employeeIds, $deadline, $assignerId)
+    {
+        $courseClass = CourseClass::with('course')->findOrFail($courseClassId);
+        $deadlineText = $deadline ? 'Hạn chót: ' . date('d/m/Y', strtotime($deadline)) : 'Không có thời hạn cụ thể';
+
+        foreach ($employeeIds as $employeeId) {
+            ClassEnrollment::create([
+                'user_id' => $employeeId,
+                'course_class_id' => $courseClassId,
+                'status' => 'Đang học',
+                'is_mandatory' => true,
+                'deadline' => $deadline,
+                'assigned_by' => $assignerId,
+                'enrolled_at' => now(),
+            ]);
+
+            $employee = User::find($employeeId);
+            if ($employee) {
+                $employee->notify(new SystemNotification(
+                    'Chỉ định đào tạo từ Bộ phận Nhân sự',
+                    "Bạn vừa được phòng Đào tạo yêu cầu tham gia lớp: <strong>{$courseClass->name}</strong> của khóa {$courseClass->course->name}. {$deadlineText}.",
+                    route('employee.my-classes.show', $courseClassId)
+                ));
+            }
+        }
     }
 }

@@ -38,4 +38,30 @@ class CourseController extends Controller
             'materials' => $data['materials']
         ]);
     }
+
+    // Lấy danh sách nhân viên đủ điều kiện để gán vào lớp
+    public function getEligibleEmployees($courseClassId)
+    {
+        $employees = $this->courseService->getEligibleEmployees($courseClassId, Auth::user()->department_id);
+        return response()->json($employees);
+    }
+
+    // Xử lý lưu thông tin chỉ định nhân viên
+    public function assignEmployees(Request $request, $courseClassId)
+    {
+        $validated = $request->validate([
+            'employee_ids' => 'required|array|min:1',
+            'employee_ids.*' => 'exists:users,id',
+            'deadline' => 'nullable|date|after_or_equal:today',
+        ]);
+
+        $this->courseService->assignEmployeesToClass(
+            $courseClassId, 
+            $validated['employee_ids'], 
+            $validated['deadline'] ?? null, 
+            Auth::id()
+        );
+
+        return redirect()->back()->with('success', 'Đã chỉ định nhân viên tham gia lớp học thành công!');
+    }
 }
