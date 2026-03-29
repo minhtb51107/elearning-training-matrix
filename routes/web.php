@@ -10,6 +10,8 @@ use App\Http\Controllers\SystemAdmin\CourseClassController as SysCourseClassCont
 use App\Http\Controllers\SystemAdmin\TrainingRequestController as SysTrainingRequestController;
 use App\Http\Controllers\SystemAdmin\EmployeeController as SysEmployeeController;
 use App\Http\Controllers\SystemAdmin\ReportController as SysReportController;
+use App\Http\Controllers\SystemAdmin\QuizController as SysQuizController; // MỚI
+use App\Http\Controllers\Employee\QuizController as EmpQuizController; // MỚI
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -17,7 +19,6 @@ Route::get('/', function () {
     return redirect()->route('login');
 });
 
-// Gọi vào DashboardController để lấy dữ liệu thống kê
 Route::get('/dashboard', [DashboardController::class, 'index'])
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
@@ -43,7 +44,6 @@ Route::middleware('auth')->group(function () {
         Route::get('/courses/{id}', [DeptCourseController::class, 'show'])->name('courses.show');
         Route::get('/employees', [DeptEmployeeController::class, 'index'])->name('employees.index');
 
-        // 👇 THÊM 2 ROUTE MỚI CHO TÍNH NĂNG CHỈ ĐỊNH NHÂN VIÊN
         Route::get('/classes/{courseClass}/eligible-employees', [DeptCourseController::class, 'getEligibleEmployees'])->name('classes.eligible-employees');
         Route::post('/classes/{courseClass}/assign-employees', [DeptCourseController::class, 'assignEmployees'])->name('classes.assign-employees');
     });
@@ -62,6 +62,24 @@ Route::middleware('auth')->group(function () {
         Route::post('/courses', [SysCourseController::class, 'store'])->name('courses.store');
         Route::get('/courses/{course}', [SysCourseController::class, 'show'])->name('courses.show');
         Route::get('/courses/{id}/statistics', function () { return Inertia::render('SystemAdmin/Courses/Statistics'); })->name('courses.statistics');
+        
+        // 👇 THÊM MỚI ROUTE CHO ADMIN TẠO/QUẢN LÝ BÀI TRẮC NGHIỆM
+        Route::prefix('courses/{course}')->group(function () {
+            // Lesson (Bài giảng)
+            Route::post('lessons', [\App\Http\Controllers\SystemAdmin\CourseLessonController::class, 'store'])->name('courses.lessons.store');
+            Route::post('lessons/{lesson}', [\App\Http\Controllers\SystemAdmin\CourseLessonController::class, 'update'])->name('courses.lessons.update');
+            Route::delete('lessons/{lesson}', [\App\Http\Controllers\SystemAdmin\CourseLessonController::class, 'destroy'])->name('courses.lessons.destroy');
+
+            // Assignment (Bài tự luận)
+            Route::post('assignments', [\App\Http\Controllers\SystemAdmin\CourseAssignmentController::class, 'store'])->name('courses.assignments.store');
+            Route::put('assignments/{assignment}', [\App\Http\Controllers\SystemAdmin\CourseAssignmentController::class, 'update'])->name('courses.assignments.update');
+            Route::delete('assignments/{assignment}', [\App\Http\Controllers\SystemAdmin\CourseAssignmentController::class, 'destroy'])->name('courses.assignments.destroy');
+
+            // Quizzes (Trắc nghiệm - đã làm ở bước trước)
+            Route::resource('quizzes', SysQuizController::class)->except(['index']);
+            Route::post('quizzes/{quiz}/questions', [SysQuizController::class, 'storeQuestion'])->name('quizzes.questions.store');
+            Route::delete('quizzes/questions/{question}', [SysQuizController::class, 'destroyQuestion'])->name('quizzes.questions.destroy');
+        });
         
         Route::get('/classes', [SysCourseClassController::class, 'index'])->name('classes.index');
         Route::get('/classes/create', [SysCourseClassController::class, 'create'])->name('classes.create');
@@ -92,7 +110,7 @@ Route::middleware('auth')->group(function () {
 
         Route::put('/employees/{employee}/hr-info', [SysEmployeeController::class, 'updateHrInfo'])->name('employees.update-hr');
         Route::get('/classes/{courseClass}/eligible-employees', [SysCourseClassController::class, 'getEligibleEmployees'])->name('classes.eligible-employees');
-Route::post('/classes/{courseClass}/assign-employees', [SysCourseClassController::class, 'assignEmployees'])->name('classes.assign-employees');
+        Route::post('/classes/{courseClass}/assign-employees', [SysCourseClassController::class, 'assignEmployees'])->name('classes.assign-employees');
     });
 
     // ==============================================================
@@ -107,8 +125,23 @@ Route::post('/classes/{courseClass}/assign-employees', [SysCourseClassController
         Route::get('/my-classes/{courseClass}', [\App\Http\Controllers\Employee\MyClassController::class, 'show'])->name('my-classes.show');
         Route::post('/my-classes/{courseClass}/complete-lesson', [\App\Http\Controllers\Employee\MyClassController::class, 'completeLesson'])->name('my-classes.complete-lesson');
         Route::post('/classes/{courseClass}/submissions', [\App\Http\Controllers\Employee\MyClassController::class, 'submitAssignment'])->name('submissions.store');
+        
+        // Quizzes
+        Route::prefix('my-classes/{courseClass}')->group(function () {
+            Route::get('/quizzes/{quiz}', [EmpQuizController::class, 'show'])->name('my-classes.quizzes.show');
+            Route::post('/quizzes/{quiz}/start', [EmpQuizController::class, 'start'])->name('my-classes.quizzes.start');
+            Route::post('/quizzes/{quiz}/submit', [EmpQuizController::class, 'submit'])->name('my-classes.quizzes.submit');
+            Route::get('/quizzes/{quiz}/result/{attempt}', [EmpQuizController::class, 'result'])->name('my-classes.quizzes.result');
+        });
+
+        // 👇 THÊM ROUTE EXPORT LỊCH HỌC
+        Route::get('/my-schedule/export', [\App\Http\Controllers\Employee\MyScheduleController::class, 'export'])->name('my-schedule.export');
         Route::get('/my-schedule', [\App\Http\Controllers\Employee\MyScheduleController::class, 'index'])->name('my-schedule');
+        
+        // 👇 THÊM ROUTE DOWNLOAD CHỨNG CHỈ (PDF)
+        Route::get('/results/{id}/certificate', [\App\Http\Controllers\Employee\ResultController::class, 'downloadCertificate'])->name('results.certificate');
         Route::get('/results', [\App\Http\Controllers\Employee\ResultController::class, 'index'])->name('results');
+        
         Route::get('/account', function () { return Inertia::render('Employee/Account/Index'); })->name('account');
     });
 });

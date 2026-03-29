@@ -58,9 +58,9 @@ class CourseController extends Controller
     
     public function show(Course $course)
     {
+        $course->load('quizzes');
         return Inertia::render('SystemAdmin/Courses/Show', compact('course'));
     }
-
     public function edit(Course $course)
     {
         $course->load('documents', 'departments', 'lessons', 'assignments'); 

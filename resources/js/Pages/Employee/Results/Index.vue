@@ -84,15 +84,6 @@ const handleAction = (item) => {
                         </div>
                     </div>
 
-                    <div class="flex justify-end mb-4">
-                        <div class="flex bg-[#e5e7eb] rounded border border-gray-400 overflow-hidden">
-                            <button class="px-6 py-1.5 text-[13px] font-bold text-gray-700 hover:bg-gray-300 border-r border-gray-400 transition">Print</button>
-                            <button class="px-6 py-1.5 text-[13px] font-bold text-gray-700 hover:bg-gray-300 border-r border-gray-400 transition">Excel</button>
-                            <button class="px-6 py-1.5 text-[13px] font-bold text-gray-700 hover:bg-gray-300 border-r border-gray-400 transition">PDF</button>
-                            <button class="px-6 py-1.5 text-[13px] font-bold text-gray-700 hover:bg-gray-300 transition">CSV</button>
-                        </div>
-                    </div>
-
                     <div class="overflow-x-auto border border-gray-400">
                         <table class="min-w-full text-center text-[13px] divide-y divide-gray-400">
                             <thead class="bg-gray-50">
@@ -161,8 +152,11 @@ const handleAction = (item) => {
                         <p class="font-bold mt-2">Mã chứng chỉ:</p>
                         <p class="text-gray-600 font-mono">CERT-{{ selectedRow?.class }}-{{ selectedRow?.id }}</p>
                     </div>
-                    <div class="flex justify-center text-[#d97706] font-bold text-[14px] uppercase tracking-wide">
-                        <button onclick="window.print()" class="hover:underline transition border border-orange-500 px-4 py-2 rounded">[ TẢI HOẶC IN PDF ]</button>
+                    <div class="flex justify-center font-bold text-[14px] uppercase tracking-wide">
+                        <a :href="route('employee.results.certificate', selectedRow?.id)" target="_blank"
+                           class="w-full text-center hover:bg-orange-50 text-[#d97706] transition border border-orange-500 px-4 py-2.5 rounded-lg">
+                           [ TẢI XUỐNG BẢN PDF ]
+                        </a>
                     </div>
                 </template>
 
@@ -181,7 +175,7 @@ const handleAction = (item) => {
                     <h3 class="text-lg font-bold text-gray-800 mb-4 border-b border-gray-300 pb-2">Thông báo</h3>
                     <div class="text-[14px] text-gray-800 leading-relaxed mb-4">
                         <p class="mb-3"><span class="font-bold">Trạng thái:</span> <span class="font-bold text-[#d97706]">Chờ đánh giá</span></p>
-                        <p>Bài thi cuối khóa của bạn đã được gửi đi. Kết quả sẽ được cập nhật sau khi giảng viên chấm điểm.</p>
+                        <p>Bài thi của bạn đã được gửi đi. Kết quả sẽ được cập nhật sau khi giảng viên chấm điểm.</p>
                     </div>
                 </template>
 

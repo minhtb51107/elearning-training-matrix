@@ -67,10 +67,19 @@ const openDetailModal = (session) => {
 
                     <div class="flex justify-end mb-4">
                         <div class="flex bg-[#e5e7eb] rounded border border-gray-400 overflow-hidden">
-                            <button class="px-6 py-1.5 text-[13px] font-bold text-gray-700 hover:bg-gray-300 border-r border-gray-400 transition">Print</button>
-                            <button class="px-6 py-1.5 text-[13px] font-bold text-gray-700 hover:bg-gray-300 border-r border-gray-400 transition">Excel</button>
-                            <button class="px-6 py-1.5 text-[13px] font-bold text-gray-700 hover:bg-gray-300 border-r border-gray-400 transition">PDF</button>
-                            <button class="px-6 py-1.5 text-[13px] font-bold text-gray-700 hover:bg-gray-300 transition">CSV</button>
+                            <button onclick="window.print()" class="px-6 py-1.5 text-[13px] font-bold text-gray-700 hover:bg-gray-300 border-r border-gray-400 transition">Print</button>
+                            
+                            <a :href="route('employee.my-schedule.export', { format: 'excel', filter_time: filterTime })" class="px-6 py-1.5 text-[13px] font-bold text-gray-700 hover:bg-gray-300 border-r border-gray-400 transition inline-flex items-center">
+                                Excel
+                            </a>
+                            
+                            <a :href="route('employee.my-schedule.export', { format: 'pdf', filter_time: filterTime })" class="px-6 py-1.5 text-[13px] font-bold text-gray-700 hover:bg-gray-300 border-r border-gray-400 transition inline-flex items-center">
+                                PDF
+                            </a>
+                            
+                            <a :href="route('employee.my-schedule.export', { format: 'csv', filter_time: filterTime })" class="px-6 py-1.5 text-[13px] font-bold text-gray-700 hover:bg-gray-300 transition inline-flex items-center">
+                                CSV
+                            </a>
                         </div>
                     </div>
 

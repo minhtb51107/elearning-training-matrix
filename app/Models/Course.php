@@ -18,12 +18,10 @@ class Course extends Model
         'description', 
         'reason', 
         'status',
-        'content'     // Thêm dòng này để phòng hờ bị lỗi tương tự với content
+        'content'
     ];
 
-    // Khóa học có thể chứa nhiều yêu cầu đào tạo
-    public function trainingRequests()
-    {
+    public function trainingRequests() {
         return $this->hasMany(TrainingRequest::class);
     }
 
@@ -31,25 +29,24 @@ class Course extends Model
         return $this->belongsToMany(Department::class, 'course_departments');
     }
     
-    // Thêm hàm này để khai báo 1 Khóa học thì có nhiều Lớp học (1-N)
-    public function courseClasses()
-    {
+    public function courseClasses() {
         return $this->hasMany(CourseClass::class);
     }
 
-    // Sửa lại hàm documents() trong file App\Models\Course.php
-    public function documents()
-    {
+    public function documents() {
         return $this->hasMany(CourseDocument::class); 
     }
 
-    public function lessons()
-    {
+    public function lessons() {
         return $this->hasMany(CourseLesson::class)->orderBy('order_num');
     }
 
-    public function assignments()
-    {
+    public function assignments() {
         return $this->hasMany(Assignment::class);
+    }
+
+    // THÊM MỚI: Liên kết với các bài trắc nghiệm
+    public function quizzes() {
+        return $this->hasMany(Quiz::class);
     }
 }

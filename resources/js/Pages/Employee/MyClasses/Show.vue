@@ -10,6 +10,7 @@ import {
     DocumentTextIcon,
     VideoCameraIcon,
     ClipboardDocumentCheckIcon,
+    ClipboardDocumentListIcon,
     ArrowUpTrayIcon,
     PaperClipIcon
 } from '@heroicons/vue/20/solid';
@@ -19,7 +20,8 @@ const props = defineProps({
     course: Object,
     lessons: { type: Array, default: () => [] },
     documents: { type: Array, default: () => [] },
-    assignments: { type: Array, default: () => [] }
+    assignments: { type: Array, default: () => [] },
+    quizzes: { type: Array, default: () => [] } // 👉 Đã thêm prop quizzes
 });
 
 const activeType = ref(props.lessons.length > 0 ? 'lesson' : (props.assignments.length > 0 ? 'assignment' : null));
@@ -35,7 +37,6 @@ const activeAssignment = computed(() => {
     return props.assignments.find(a => a.id === activeId.value) || null;
 });
 
-// ĐÃ SỬA: Lấy đúng assignment_id ngay lúc khởi tạo thay vì để rỗng
 const submissionForm = useForm({
     assignment_id: activeType.value === 'assignment' ? activeId.value : '',
     answers: [], 
@@ -47,7 +48,7 @@ const setActive = (type, id) => {
     activeId.value = id;
     if (type === 'assignment') {
         submissionForm.assignment_id = id;
-        submissionForm.answers = []; // Reset form
+        submissionForm.answers = []; 
         submissionForm.clearErrors();
     }
 };
@@ -111,7 +112,6 @@ const submitAssignment = () => {
         preserveScroll: true,
         onSuccess: () => {
             submissionForm.reset('answers', 'file');
-            // Load lại cục props để cập nhật trạng thái UI
             router.reload({ only: ['assignments'] });
         }
     });
@@ -323,14 +323,14 @@ const submitAssignment = () => {
                             </div>
                         </div>
 
-                        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col max-h-[600px]">
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col max-h-[700px]">
                             
                             <div class="p-4 bg-gray-50 border-b border-gray-200">
                                 <h3 class="font-bold text-gray-900">Danh sách Bài giảng</h3>
                                 <p class="text-xs text-gray-500 mt-0.5">{{ lessons.length }} bài học</p>
                             </div>
                             
-                            <div class="overflow-y-auto max-h-[250px] p-2 space-y-1">
+                            <div class="overflow-y-auto max-h-[200px] p-2 space-y-1">
                                 <div v-if="lessons.length === 0" class="p-4 text-center text-sm text-gray-500 italic">
                                     Khóa học này chưa có nội dung.
                                 </div>
@@ -362,13 +362,13 @@ const submitAssignment = () => {
                             </div>
 
                             <div class="p-4 bg-gray-50 border-y border-gray-200">
-                                <h3 class="font-bold text-gray-900">Bài Kiểm Tra / Đánh Giá</h3>
+                                <h3 class="font-bold text-gray-900">Bài Tập Tự Luận</h3>
                                 <p class="text-xs text-gray-500 mt-0.5">{{ assignments?.length || 0 }} bài tập</p>
                             </div>
                             
-                            <div class="overflow-y-auto flex-1 p-2 space-y-1">
+                            <div class="overflow-y-auto max-h-[150px] p-2 space-y-1">
                                 <div v-if="!assignments || assignments.length === 0" class="p-4 text-center text-sm text-gray-500 italic">
-                                    Không có bài tập nào.
+                                    Không có bài tự luận nào.
                                 </div>
                                 
                                 <button v-for="(assignment, index) in assignments" :key="assignment.id" 
@@ -390,6 +390,34 @@ const submitAssignment = () => {
                                         </p>
                                     </div>
                                 </button>
+                            </div>
+
+                            <div class="p-4 bg-gray-50 border-y border-gray-200">
+                                <h3 class="font-bold text-gray-900">Thi Trắc Nghiệm / Quiz</h3>
+                                <p class="text-xs text-gray-500 mt-0.5">{{ quizzes?.length || 0 }} bài thi</p>
+                            </div>
+                            <div class="overflow-y-auto flex-1 p-2 space-y-1 bg-white">
+                                <div v-if="!quizzes || quizzes.length === 0" class="p-4 text-center text-sm text-gray-500 italic">
+                                    Không có bài thi trắc nghiệm nào.
+                                </div>
+                                
+                                <Link v-for="(quiz, index) in quizzes" :key="quiz.id" 
+                                        :href="route('employee.my-classes.quizzes.show', [classInfo.id, quiz.id])"
+                                        class="w-full text-left p-3 rounded-lg flex gap-3 items-start transition-all hover:bg-gray-50 border border-transparent group">
+                                    
+                                    <div class="mt-0.5 flex-shrink-0">
+                                        <ClipboardDocumentListIcon class="w-5 h-5 text-gray-400 group-hover:text-indigo-600" />
+                                    </div>
+                                    
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-sm font-semibold line-clamp-2 leading-tight text-gray-700 group-hover:text-indigo-700">
+                                            {{ quiz.title }}
+                                        </p>
+                                        <p class="text-[11px] mt-1 font-medium text-gray-500">
+                                            Thời gian: {{ quiz.duration_minutes }} phút • Điểm đạt: {{ quiz.pass_score }}
+                                        </p>
+                                    </div>
+                                </Link>
                             </div>
 
                         </div>

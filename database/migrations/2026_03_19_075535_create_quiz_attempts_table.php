@@ -5,15 +5,18 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
     public function up(): void {
-        Schema::create('quiz_options', function (Blueprint $table) {
+        Schema::create('quiz_attempts', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('quiz_question_id')->constrained('quiz_questions')->cascadeOnDelete();
-            $table->string('option_text');
-            $table->boolean('is_correct')->default(false);
+            $table->foreignId('quiz_id')->constrained('quizzes')->cascadeOnDelete();
+            $table->foreignId('class_enrollment_id')->constrained('class_enrollments')->cascadeOnDelete();
+            $table->integer('score')->nullable();
+            $table->enum('status', ['passed', 'failed', 'in_progress'])->default('in_progress');
+            $table->timestamp('started_at')->useCurrent();
+            $table->timestamp('completed_at')->nullable();
             $table->timestamps();
         });
     }
     public function down(): void {
-        Schema::dropIfExists('quiz_options');
+        Schema::dropIfExists('quiz_attempts');
     }
 };

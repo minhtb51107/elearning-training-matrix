@@ -15,7 +15,6 @@ class ClassEnrollment extends Model
         'progress_percent',
         'enrolled_at',
         'completed_at',
-        // THÊM 3 TRƯỜNG MỚI CHO TÍNH NĂNG CHỈ ĐỊNH
         'is_mandatory',
         'deadline',
         'assigned_by'
@@ -29,8 +28,12 @@ class ClassEnrollment extends Model
         return $this->belongsTo(CourseClass::class, 'course_class_id');
     }
 
-    // THÊM RELATIONSHIP: Liên kết tới người Trưởng phòng đã ra lệnh chỉ định
     public function assignedBy() {
         return $this->belongsTo(User::class, 'assigned_by');
+    }
+
+    // THÊM MỚI: Lịch sử làm bài trắc nghiệm của học viên này
+    public function quizAttempts() {
+        return $this->hasMany(QuizAttempt::class);
     }
 }
