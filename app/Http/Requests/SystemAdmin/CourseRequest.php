@@ -12,7 +12,6 @@ class CourseRequest extends FormRequest
     {
         return [
             'name' => 'required|string|max:255',
-            // KHÓA VAN: Chỉ cho phép các giá trị đối tượng này lọt qua
             'target_audience' => 'required|string|in:Toàn công ty,Cấp quản lý,Nhân viên mới,Toàn phòng,Cá nhân',
             'duration' => 'required|numeric|min:0',
             'format' => 'required|string',
@@ -21,13 +20,24 @@ class CourseRequest extends FormRequest
             'description' => 'nullable|string',
             'reason' => 'nullable|string',
             'request_ids' => 'nullable|array',
+            
+            // Bài giảng
             'lessons' => 'nullable|array',
+            'deleted_lesson_ids' => 'nullable|array',
+            
+            // Bài tự luận
             'assignments' => 'nullable|array',
+            'deleted_assignment_ids' => 'nullable|array',
+            
+            // Tài liệu
             'documents' => 'nullable|array',
             'new_documents' => 'nullable|array',
-            'deleted_lesson_ids' => 'nullable|array',
-            'deleted_assignment_ids' => 'nullable|array',
             'deleted_document_ids' => 'nullable|array',
+            
+            // 👇 THÊM MỚI: Cho phép dữ liệu Trắc nghiệm đi qua Validation
+            'quizzes' => 'nullable|array',
+            'deleted_quiz_ids' => 'nullable|array',
+            'deleted_quiz_question_ids' => 'nullable|array',
         ];
     }
 

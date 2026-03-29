@@ -49,8 +49,7 @@ class DashboardService
 
                 $firstSession = $cls->sessions->sortBy('date')->first();
                 $timeStr = $firstSession ? Carbon::parse($firstSession->start_time)->format('H:i') . ' - ' . Carbon::parse($firstSession->end_time)->format('H:i') : 'Theo lịch phân công';
-                $formatStr = $firstSession ? $firstSession->format . ($firstSession->room ? ' - Phòng ' . $firstSession->room : '') : $cls->format;
-
+                $formatStr = $firstSession ? $cls->format . ($firstSession->room ? ' - Phòng ' . $firstSession->room : '') : $cls->format;
                 return [
                     'id' => $cls->id,
                     'date' => $dateStr,

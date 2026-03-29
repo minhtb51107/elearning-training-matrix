@@ -35,7 +35,6 @@ class CourseController extends Controller
     public function create(Request $request)
     {
         return Inertia::render('SystemAdmin/Courses/Create', [
-            // 👉 Sửa 'approved' thành RequestStatusEnum
             'approvedRequests' => TrainingRequest::with('department')
                 ->where('status', RequestStatusEnum::APPROVED->value)
                 ->latest()
@@ -58,12 +57,15 @@ class CourseController extends Controller
     
     public function show(Course $course)
     {
-        $course->load('quizzes');
+        // 👉 CẬP NHẬT: Load đầy đủ các liên kết cho màn hình Show
+        $course->load(['documents', 'lessons', 'assignments', 'quizzes.questions.options']);
         return Inertia::render('SystemAdmin/Courses/Show', compact('course'));
     }
+
     public function edit(Course $course)
     {
-        $course->load('documents', 'departments', 'lessons', 'assignments'); 
+        // 👉 CẬP NHẬT: Bắt buộc phải thêm 'quizzes.questions.options' để Vue nhận được dữ liệu Trắc nghiệm
+        $course->load(['documents', 'departments', 'lessons', 'assignments', 'quizzes.questions.options']); 
         return Inertia::render('SystemAdmin/Courses/Edit', [
             'course' => $course,
             'departments' => Department::all() 

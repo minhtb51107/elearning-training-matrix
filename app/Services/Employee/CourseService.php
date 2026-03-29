@@ -3,6 +3,7 @@
 namespace App\Services\Employee;
 
 use App\Models\Course;
+use App\Models\User;
 use App\Models\CourseClass;
 use App\Models\ClassEnrollment;
 use App\Enums\EnrollmentStatusEnum;
@@ -14,7 +15,6 @@ class CourseService
 {
     public function getAvailableCourses($user, array $filters)
     {
-        // LOGIC CHUẨN: Lọc khóa học dựa trên Thân phận (HR Info) của người dùng
         $query = Course::where(function($q) use ($user) {
             
             // 1. Luôn thấy các khóa học dành cho Toàn công ty
@@ -30,14 +30,13 @@ class CourseService
                 $q->orWhere('target_audience', 'Cấp quản lý');
             }
 
-            // 4. NẾU LÀ LÍNH MỚI (vào làm <= 2 tháng): Thấy thêm khóa Nhân viên mới
+            // 4. NẾU LÀ LÍNH MỚI: Thấy thêm khóa Nhân viên mới
             if ($user->join_date && Carbon::parse($user->join_date)->diffInMonths(now()) <= 2) {
                 $q->orWhere('target_audience', 'Nhân viên mới');
             }
 
         })->latest();
 
-        // Tìm kiếm theo tên / mã
         if (!empty($filters['keyword'])) {
             $query->where(function($q) use ($filters) {
                 $q->where('name', 'like', '%' . $filters['keyword'] . '%')
@@ -45,9 +44,6 @@ class CourseService
             });
         }
 
-        // Bỏ qua cái filter "Bắt buộc" cũ bị sai logic.
-        // Thực tế Khóa bắt buộc sẽ nằm bên tab "Lớp học của tôi" do Trưởng phòng ép. 
-        // Ở màn hình Khám phá này, nếu UI vẫn truyền filter 'type', ta có thể map tạm để không lỗi UI.
         if (!empty($filters['type']) && $filters['type'] !== 'Tất cả') {
             if ($filters['type'] === 'Bắt buộc') {
                 $query->whereIn('target_audience', ['Toàn phòng', 'Toàn công ty']);
@@ -69,14 +65,36 @@ class CourseService
             'documents'
         ])->findOrFail($id);
 
-        $classes = $course->courseClasses->map(function ($cls) use ($userId) {
-            $enrolledCount = ClassEnrollment::where('course_class_id', $cls->id)->count();
+        $user = User::find($userId);
+
+        // KHẮC PHỤC LỖ HỔNG BẢO MẬT (IDOR): Kiểm tra quyền xem chi tiết khóa học
+        $isAllowed = $course->target_audience === 'Toàn công ty' 
+            || ($course->target_audience === 'Cấp quản lý' && $user->is_manager)
+            || ($course->target_audience === 'Nhân viên mới' && $user->join_date && Carbon::parse($user->join_date)->diffInMonths(now()) <= 2)
+            || $course->departments()->where('departments.id', $user->department_id)->exists();
+
+        if (!$isAllowed) {
+            abort(403, 'Bạn không có quyền truy cập khóa học này.');
+        }
+
+        $classIds = $course->courseClasses->pluck('id');
+        
+        $enrollmentCounts = ClassEnrollment::whereIn('course_class_id', $classIds)
+            ->selectRaw('course_class_id, count(*) as count')
+            ->groupBy('course_class_id')
+            ->pluck('count', 'course_class_id');
+
+        $userEnrolledClassIds = ClassEnrollment::whereIn('course_class_id', $classIds)
+            ->where('user_id', $userId)
+            ->pluck('course_class_id')
+            ->toArray();
+
+        $classes = $course->courseClasses->map(function ($cls) use ($enrollmentCounts, $userEnrolledClassIds) {
+            $enrolledCount = $enrollmentCounts[$cls->id] ?? 0;
             $maxStudents = $cls->max_students ?? 30; 
             $isFull = $enrolledCount >= $maxStudents;
 
-            $isEnrolled = ClassEnrollment::where('course_class_id', $cls->id)
-                            ->where('user_id', $userId)
-                            ->exists();
+            $isEnrolled = in_array($cls->id, $userEnrolledClassIds);
 
             return [
                 'id' => $cls->id,
@@ -124,6 +142,19 @@ class CourseService
 
     public function enrollUser($classId, $user)
     {
+        $courseClass = CourseClass::find($classId);
+        
+        if (!$courseClass) {
+            return false;
+        }
+
+        $enrolledCount = ClassEnrollment::where('course_class_id', $classId)->count();
+        $maxStudents = $courseClass->max_students ?? 30;
+
+        if ($enrolledCount >= $maxStudents) {
+            return false; 
+        }
+
         $exists = ClassEnrollment::where('course_class_id', $classId)
                     ->where('user_id', $user->id)
                     ->exists();
@@ -135,7 +166,6 @@ class CourseService
                 'status' => EnrollmentStatusEnum::ENROLLED->value
             ]);
 
-            $courseClass = CourseClass::find($classId);
             $user->notify(new SystemNotification(
                 'Đăng ký thành công',
                 'Bạn đã ghi danh thành công vào lớp: <strong>' . ($courseClass->name ?? 'N/A') . '</strong>. Hãy chuẩn bị lịch học nhé!',

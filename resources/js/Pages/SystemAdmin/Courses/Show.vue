@@ -208,7 +208,15 @@ const removeNewDocument = (index) => {
 // GỬI LÊN SERVER
 // ==========================================
 const submitForm = () => {
-    form.post(route('system.courses.update', props.course.id), { preserveScroll: true });
+    form.transform((data) => ({
+        ...data,
+        // Đảm bảo dữ liệu mảng lồng nhau không bị InertiaJS chuyển sai định dạng
+        quizzes: Array.from(data.quizzes || []), 
+        deleted_quiz_ids: Array.from(data.deleted_quiz_ids || []),
+        deleted_quiz_question_ids: Array.from(data.deleted_quiz_question_ids || []),
+    })).post(route('system.courses.update', props.course.id), { 
+        preserveScroll: true 
+    });
 };
 </script>
 

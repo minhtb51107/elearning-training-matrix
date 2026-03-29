@@ -49,6 +49,7 @@ class MyClassService
         $courseClass = CourseClass::with([
             'course.lessons',
             'course.documents',
+            'course.quizzes', // 👉 THÊM DÒNG NÀY (Load dữ liệu bài trắc nghiệm từ DB)
             'course.assignments.submissions' => function($query) use ($userId, $classId) {
                 $query->where('user_id', $userId)->where('course_class_id', $classId);
             }

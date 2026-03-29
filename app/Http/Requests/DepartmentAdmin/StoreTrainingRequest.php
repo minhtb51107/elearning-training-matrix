@@ -2,6 +2,9 @@
 
 namespace App\Http\Requests\DepartmentAdmin;
 
+use App\Enums\RequestStatusEnum;
+use Illuminate\Validation\Rule;
+
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreTrainingRequest extends FormRequest
